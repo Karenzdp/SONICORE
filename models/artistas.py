@@ -16,7 +16,7 @@ class Artista(SQLModel, table=True):
     biografia: Optional[str] = None
     foto: Optional[str] = None
 
-    genero_principal_id: Optional[int] = Field(default=None, foreign_key="generos.id_genero")
+    genero_principal_id: int = Field(foreign_key="generos.id_genero")
     genero_principal: Optional["Genero"] = Relationship(back_populates="artistas")
 
 
