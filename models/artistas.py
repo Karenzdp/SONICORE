@@ -1,38 +1,41 @@
 from sqlmodel import SQLModel, Field, Relationship
-from typing import Optional, TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING, List
 from datetime import date
 
 if TYPE_CHECKING:
     from models.generos import Genero
+    from models.canciones import Cancion
+    from models.albumes import Album
 
-# ========== MODELO DE BASE DE DATOS ==========
 class Artista(SQLModel, table=True):
     __tablename__ = "artistas"
 
     id_artista: Optional[int] = Field(default=None, primary_key=True)
     nombre: str
     nacionalidad: Optional[str] = None
-    fecha_nacimiento: Optional[date] = None  # date object para DB
+    activo: bool = Field(default=True)
+    fecha_nacimiento: Optional[date] = None
     biografia: Optional[str] = None
     foto: Optional[str] = None
 
     genero_principal_id: int = Field(foreign_key="generos.id_genero")
     genero_principal: Optional["Genero"] = Relationship(back_populates="artistas")
 
+    canciones: List["Cancion"] = Relationship(back_populates="artista")
+    albunes: List["Album"] = Relationship(back_populates="artista_principal")
 
-# ========== SCHEMAS PARA API ==========
+
+#SCHEMAS
 class ArtistaCreate(SQLModel):
-    """Schema para crear un artista (entrada)"""
     nombre: str
     nacionalidad: Optional[str] = None
-    fecha_nacimiento: Optional[date] = None  # Pydantic convierte automáticamente
+    fecha_nacimiento: Optional[date] = None
     biografia: Optional[str] = None
     foto: Optional[str] = None
     genero_principal_id: Optional[int] = None
 
 
 class ArtistaRead(SQLModel):
-    """Schema para leer un artista (salida)"""
     id_artista: int
     nombre: str
     nacionalidad: Optional[str] = None
@@ -40,3 +43,13 @@ class ArtistaRead(SQLModel):
     biografia: Optional[str] = None
     foto: Optional[str] = None
     genero_principal_id: Optional[int] = None
+    
+class ArtistaUpdate(SQLModel):
+    nombre: Optional[str] = ""
+    nacionalidad: Optional[str] = ""
+    fecha_nacimiento: Optional[date] = None
+    biografia: Optional[str] = ""
+    foto: Optional[str] = ""
+    #genero_principal_id: Optional[int] = None
+    
+
