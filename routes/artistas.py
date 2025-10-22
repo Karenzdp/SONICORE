@@ -1,7 +1,8 @@
+from datetime import date
 from fastapi import APIRouter, HTTPException
 from sqlmodel import Session, select
 from database.connection import engine
-from models.artistas import Artista, ArtistaCreate, ArtistaRead
+from models.artistas import Artista, ArtistaCreate, ArtistaRead, ArtistaUpdate
 from models.generos import Genero
 
 router = APIRouter(prefix="/artistas", tags=["Artistas"])
@@ -25,11 +26,17 @@ def crear_artista(artista: ArtistaCreate):
         return nuevo_artista
 
 
-# Listar todos
-@router.get("/", response_model=list[ArtistaRead])
+@router.get("/")
 def obtener_artistas():
     with Session(engine) as session:
-        artistas = session.exec(select(Artista)).all()
+        artistas = session.exec(select(Artista).where(Artista.activo == True)).all()
+        return artistas
+
+# Obtener artistas inactivos (papelera)
+@router.get("/inactivos")
+def obtener_inactivos():
+    with Session(engine) as session:
+        artistas = session.exec(select(Artista).where(Artista.activo == False)).all()
         return artistas
 
 # OBTENER POR ID
@@ -75,32 +82,54 @@ def obtener_artista_por_ID_genero(genero_id: int):
 
 
 # Actualizar artista
-@router.put("/{id_artista}", response_model=ArtistaRead)
-def actualizar_artista(id_artista: int, datos: ArtistaCreate):  # ✅ Usar ArtistaCreate
+@router.put("/{id_artista}")
+def actualizar_artista(id_artista: int, artista: ArtistaUpdate):
     with Session(engine) as session:
-        artista_db = session.get(Artista, id_artista)
-        if not artista_db:
+        db_artista = session.get(Artista, id_artista)
+        if not db_artista:
             raise HTTPException(status_code=404, detail="Artista no encontrado")
 
-        # Actualizar solo los campos enviados
-        datos_dict = datos.model_dump(exclude_unset=True)
-        
-        for k, v in datos_dict.items():
-            setattr(artista_db, k, v)
+        datos_actualizados = artista.dict(exclude_unset=True)
 
-        session.add(artista_db)
+        for campo, valor in datos_actualizados.items():
+            if valor in (None, "", " "):  # Ignora campos vacíos
+                continue
+            if campo == "fecha_nacimiento" and isinstance(valor, str):
+                try:
+                    valor = date.fromisoformat(valor)
+                except ValueError:
+                    raise HTTPException(status_code=400, detail="Formato de fecha inválido (usa YYYY-MM-DD)")
+            setattr(db_artista, campo, valor)
+
+        session.add(db_artista)
         session.commit()
-        session.refresh(artista_db)
-        return artista_db
+        session.refresh(db_artista)
+
+        return {"mensaje": "Artista actualizado correctamente", "artista": db_artista}
 
 # Eliminar
-@router.delete("/{id_artista}", status_code=204)
+@router.delete("/{id_artista}")
 def eliminar_artista(id_artista: int):
     with Session(engine) as session:
         artista = session.get(Artista, id_artista)
         if not artista:
             raise HTTPException(status_code=404, detail="Artista no encontrado")
-        
-        session.delete(artista)
+        artista.activo = False
+        session.add(artista)
         session.commit()
+        
         return {"mensaje": "Artista eliminado correctamente"}
+
+"""
+# Restaurar artista
+@router.put("/{id_artista}/restaurar")
+def restaurar_artista(id_artista: int):
+    with Session(engine) as session:
+        artista = session.get(Artista, id_artista)
+        if not artista:
+            raise HTTPException(status_code=404, detail="Artista no encontrado")
+        artista.activo = True
+        session.add(artista)
+        session.commit()
+        return {"mensaje": "Artista restaurado correctamente"}
+"""
