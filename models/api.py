@@ -2,7 +2,6 @@ from sqlmodel import SQLModel, Field
 from typing import Optional
 from datetime import datetime
 
-
 class API(SQLModel, table=True):
     __tablename__ = "apis"
 
