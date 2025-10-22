@@ -2,7 +2,6 @@ from datetime import date
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional, List, TYPE_CHECKING
 
-
 if TYPE_CHECKING:
     from models.artistas import Artista
     from models.generos import Genero
