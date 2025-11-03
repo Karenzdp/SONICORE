@@ -18,7 +18,11 @@ def crear_artista(artista: ArtistaCreate):
                 raise HTTPException(
                     status_code=400, detail="El género indicado no existe, no se puede crear el artista"
                 )
-
+        if not genero.activo:
+                raise HTTPException(
+                    status_code=400, 
+                    detail="El género seleccionado está inactivo, no se puede crear el artista"
+                )
         nuevo_artista = Artista(**artista.model_dump())
         session.add(nuevo_artista)
         session.commit()

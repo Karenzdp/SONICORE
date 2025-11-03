@@ -12,6 +12,26 @@ class Usuario(SQLModel, table=True):
     activo: bool = Field(default=True)
     fecha_registro: datetime = Field(default_factory=datetime.utcnow)
 
+# SCHEMAS
+class UsuarioCreate(SQLModel):
+    nombre_usuario: str
+    correo: str
+    contrasena: str
+
+
+class UsuarioRead(SQLModel):
+    id_usuario: int
+    nombre_usuario: str
+    correo: str
+    activo: bool
+    fecha_registro: datetime
+
+
+class UsuarioUpdate(SQLModel):
+    nombre_usuario: Optional[str] = ""
+    correo: Optional[str] = ""
+    contrasena: Optional[str] = ""
+    activo: Optional[bool] = True
 
 
 
