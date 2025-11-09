@@ -1,5 +1,13 @@
 from fastapi import FastAPI
-from database.connection import create_db_and_tables
+from database.database import create_db_and_tables
+from database.database import engine
+from sqlalchemy import text
+
+with engine.connect() as connection:
+    result = connection.execute(text("SELECT version();"))
+    for row in result:
+        print(f"✅ Conectado a: {row}")
+
 from routes.artistas import router as artistas
 from routes.generos import router as generos
 from routes.albumes import router as albumes
