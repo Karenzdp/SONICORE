@@ -1,7 +1,7 @@
 #SE HIZO TODO LO DE ROUTES DE GENEROS
 from fastapi import APIRouter, HTTPException
 from sqlmodel import Session, select
-from database.connection import engine
+from database.database import engine
 from models.generos import Genero, GeneroCreate, GeneroRead, GeneroUpdate
 
 router = APIRouter(prefix="/generos", tags=["Géneros"])

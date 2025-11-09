@@ -4,7 +4,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlmodel import Session, select
 from passlib.context import CryptContext
 from models.usuario import Usuario, UsuarioCreate, UsuarioRead, UsuarioUpdate
-from database.connection import engine
+from database.database import engine
 
 router = APIRouter(prefix="/usuarios", tags=["Usuarios"])
 

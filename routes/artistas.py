@@ -1,9 +1,10 @@
 from datetime import date
 from fastapi import APIRouter, HTTPException
 from sqlmodel import Session, select
-from database.connection import engine
+from database.database import engine
 from models.artistas import Artista, ArtistaCreate, ArtistaRead, ArtistaUpdate
 from models.generos import Genero
+from utils.errors import not_found
 
 router = APIRouter(prefix="/artistas", tags=["Artistas"])
 
@@ -123,17 +124,17 @@ def eliminar_artista(id_artista: int):
         session.commit()
         
         return {"mensaje": "Artista eliminado correctamente"}
+"""
+@router.put("/{id}/reactivar")
+def reactivar_artista(id: int, session: Session = Depends(get_session)):
+    artista = session.get(Artista, id)
+    if not artista:
+        raise not_found("Artista")
+    if artista.activo:
+        return {"mensaje": "El artista ya está activo"}
 
-"""
-# Restaurar artista
-@router.put("/{id_artista}/restaurar")
-def restaurar_artista(id_artista: int):
-    with Session(engine) as session:
-        artista = session.get(Artista, id_artista)
-        if not artista:
-            raise HTTPException(status_code=404, detail="Artista no encontrado")
-        artista.activo = True
-        session.add(artista)
-        session.commit()
-        return {"mensaje": "Artista restaurado correctamente"}
-"""
+    artista.activo = True
+    session.add(artista)
+    session.commit()
+    session.refresh(artista)
+    return {"mensaje": "Artista reactivado correctamente", "artista": artista}"""

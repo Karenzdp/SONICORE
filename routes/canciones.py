@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException
 from sqlmodel import Session, select
 from models.albumes import Album
 from models.generos import Genero
-from database.connection import engine
+from database.database import engine
 from models.canciones import Cancion, CancionCreate, CancionRead, CancionUpdate
 from models.artistas import Artista, ArtistaUpdate
 from datetime import date

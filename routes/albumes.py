@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException
 from sqlmodel import Session, select
 from models.generos import Genero
 from models.artistas import Artista
-from database.connection import engine
+from database.database import engine
 from models.albumes import Album, AlbumCreate, AlbumRead, AlbumUpdate
 
 router = APIRouter(prefix="/albunes", tags=["lÁbumes"])

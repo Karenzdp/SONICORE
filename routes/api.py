@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from sqlmodel import Session, select
-from database.connection import engine
+from database.database import engine
 from models.api import API, APICreate, APIRead, APIUpdate
 
 router = APIRouter(prefix="/apis", tags=["APIs"])
