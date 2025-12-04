@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ playlist.name }} - SONICORE</title>
+    <link href="{{ url_for('static', path='/styles.css') }}?v=7" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <style>
+        .playlist-header {
+            display: flex; align-items: flex-end; gap: 30px; padding: 40px;
+            background: linear-gradient(to bottom, #4a4a4a, #121212);
+        }
+        .playlist-cover { 
+            width: 230px; height: 230px; box-shadow: 0 10px 30px rgba(0,0,0,0.6); object-fit: cover; border-radius: 8px;
+        }
+        .pl-type { font-size: 12px; font-weight: bold; text-transform: uppercase; margin-bottom: 5px; }
+        .pl-title { font-size: 50px; font-weight: 900; margin: 0; color: white; line-height: 1.1; }
+        .pl-desc { color: #ccc; font-size: 14px; margin-top: 15px; max-width: 600px; }
+        .pl-meta { margin-top: 10px; font-size: 14px; font-weight: bold; color: white; }
+        
+        .btn-play-big { 
+            background: #1DB954; border: none; border-radius: 50%; width: 60px; height: 60px; 
+            font-size: 24px; display: flex; align-items: center; justify-content: center; 
+            cursor: pointer; margin-top: 20px; transition: transform 0.2s; 
+            box-shadow: 0 5px 15px rgba(0,0,0,0.4); 
+        }
+        .btn-play-big:hover { transform: scale(1.05); background: #1ed760; }
+
+        /* Ajustes del Modal */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 5000; display: none; justify-content: center; align-items: center; backdrop-filter: blur(5px); }
+        .modal { background: #181818; color: #fff; padding: 0; border-radius: 15px; width: 90%; max-width: 600px; box-shadow: 0 20px 50px rgba(0,0,0,0.8); display: flex; flex-direction: column; overflow: hidden; border-top: 5px solid #1DB954; }
+    </style>
+</head>
+<body>
+    <div class="main-content" style="background: #121212; min-height: 100vh; padding-bottom:100px;">
+        
+        <nav class="navbar" style="background: transparent;">
+            <a href="/web/?filtro=explorar" style="color:white; font-size:18px; text-decoration:none; display:flex; align-items:center; gap:10px;">
+                <i class="fas fa-arrow-left"></i> Volver
+            </a>
+        </nav>
+
+        <div class="playlist-header">
+            <img src="{{ playlist.images[0].url }}" class="playlist-cover">
+            <div>
+                <div class="pl-type">Playlist</div>
+                <h1 class="pl-title">{{ playlist.name }}</h1>
+                <p class="pl-desc">{{ playlist.description }}</p>
+                <div class="pl-meta">
+                    Creada por {{ playlist.owner.display_name }} • {{ canciones|length }} canciones
+                </div>
+                <button class="btn-play-big" onclick="control('play?uri={{ playlist.uri }}')">
+                    <i class="fas fa-play"></i>
+                </button>
+            </div>
+        </div>
+
+        <div class="scroll-area" style="padding: 20px 40px;">
+            <div style="border-bottom:1px solid #333; padding-bottom:10px; margin-bottom:10px; font-size:12px; text-transform:uppercase; display:flex; color:#aaa;">
+                <div style="width:40px">#</div>
+                <div style="flex:1">Título</div>
+                <div style="flex:1">Álbum</div>
+                <div style="width:100px; text-align:right;">Duración</div>
+            </div>
+
+            {% for c in canciones %}
+            <div class="track-row">
+                <div class="t-num" style="color:var(--c-gold); width:40px; text-align:center;">{{ loop.index }}</div>
+                
+                <div class="t-info" style="flex:1;">
+                    <span class="t-title">{{ c.titulo }}</span>
+                    <span class="t-sub" style="font-size:12px; color:#aaa;">{{ c.artista }}</span>
+                </div>
+                
+                <div style="flex:1; font-size:13px; color:#aaa; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                    {{ c.album }}
+                </div>
+                
+                <div style="display:flex; gap:15px; margin-right:20px; align-items:center;">
+                    
+                    <i class="fas fa-play-circle" style="cursor:pointer; font-size:20px; color:var(--c-spotify);" 
+                       onclick="control('play?uri={{ c.uri }}')"></i>
+                       
+                    <i class="fas fa-chart-pie" style="cursor:pointer; font-size:18px; color:var(--c-salmon);" 
+                       onclick="abrirAnalisis('{{ c.titulo | replace("'", "") }}', '{{ c.id }}', '{{ c.duracion }}')"></i>
+                    
+                    {% if c.is_local %}
+                        {% set icon_class = 'fas' if c.is_liked else 'far' %}
+                        {% set icon_color = 'var(--c-salmon)' if c.is_liked else 'gray' %}
+                        <i class="{{ icon_class }} fa-heart" title="Me Gusta" 
+                           style="cursor:pointer; font-size:18px; color:{{ icon_color }};"
+                           onclick="toggleLikeLocal(this, {{ c.local_id }})"></i>
+                    {% else %}
+                        <i class="far fa-heart" title="Guardar en mi Biblioteca" 
+                           style="cursor:pointer; font-size:18px; color:gray;"
+                           onclick="importarYLike('{{ c.titulo }}', '{{ c.artista }}', this)"></i>
+                    {% endif %}
+
+                </div>
+
+                <div style="width:60px; text-align:right; font-size:13px;">{{ c.duracion }}</div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modal-analisis">
+        <div class="modal" style="padding: 20px;">
+            <h2 id="analisis-titulo" style="color:white; text-align:center; margin-bottom:20px;">Análisis</h2>
+            <div style="display:flex; justify-content:space-around; margin-bottom:15px; color:#bbb; font-size:14px;">
+                <div>🎹 BPM: <span id="val-tempo" style="color:white;">--</span></div>
+                <div>🎼 Tono: <span id="val-key" style="color:white;">--</span></div>
+                <div>⏱️ Duración: <span id="val-duracion" style="color:white;">--</span></div>
+            </div>
+            <div style="text-align:center; margin-bottom:10px; font-size:13px; background:#222; padding:5px; border-radius:5px;">
+                🌍 <span id="val-markets" style="color:white;">Cargando...</span>
+                <span id="flag-co" style="display:none;">🇨🇴 ✅</span>
+            </div>
+            <div style="position: relative; width:100%; height:300px;"><canvas id="graficoRadar"></canvas></div>
+            <div style="display:flex; justify-content:center; margin-top:20px;">
+                <button onclick="document.getElementById('modal-analisis').style.display='none'" style="background:#555; color:white; border:none; padding:8px 20px; border-radius:5px; cursor:pointer;">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="player-bar">
+        <div class="player-info">
+            <img id="p-img" src="https://via.placeholder.com/50" style="width:50px; height:50px; border-radius:5px;">
+            <div style="margin-left:10px;">
+                <div id="p-title" style="color:white; font-weight:bold; font-size:14px;">Nada sonando</div>
+                <div id="p-artist" style="color:#aaa; font-size:12px;">--</div>
+            </div>
+        </div>
+        <div class="player-controls">
+            <button onclick="control('prev')"><i class="fas fa-step-backward"></i></button>
+            <button onclick="control('play')" id="btn-play" style="font-size:35px;"><i class="fas fa-play-circle"></i></button>
+            <button onclick="control('pause')" id="btn-pause" style="display:none; font-size:35px;"><i class="fas fa-pause-circle"></i></button>
+            <button onclick="control('next')"><i class="fas fa-step-forward"></i></button>
+        </div>
+        <div class="player-vol">
+            <i class="fas fa-volume-up"></i>
+            <input type="range" min="0" max="100" value="50" onchange="control('volume/' + this.value)">
+        </div>
+    </div>
+
+    <script>
+        // --- LÓGICA DE CORAZÓN INTELIGENTE ---
+        async function importarYLike(titulo, artista, btn) {
+            // Efecto visual inmediato
+            btn.className = "fas fa-spinner fa-spin"; 
+            
+            try {
+                // 1. Importamos al Artista (que trae la canción en su top o se busca)
+                // Nota: Para ser precisos, importamos al artista dueño
+                const res = await fetch(`/apis/importar/${encodeURIComponent(artista)}`, { method: 'POST' });
+                
+                if(res.ok) {
+                    // 2. Recargamos la página para que la canción ya aparezca como "Local"
+                    // y podamos darle like real
+                    location.reload();
+                } else {
+                    alert("Error al importar para dar like.");
+                    btn.className = "far fa-heart"; // Restaurar
+                }
+            } catch(e) { 
+                alert("Error de conexión"); 
+                btn.className = "far fa-heart"; 
+            }
+        }
+
+        async function toggleLikeLocal(btn, id) {
+            try {
+                const res = await fetch(`/web/like/${id}`, { method: 'POST' });
+                const data = await res.json();
+                if(data.es_favorito) { btn.classList.remove('far'); btn.classList.add('fas'); btn.style.color = 'var(--c-salmon)'; }
+                else { btn.classList.remove('fas'); btn.classList.add('far'); btn.style.color = 'gray'; }
+            } catch(e){}
+        }
+
+        // --- OTRAS FUNCIONES (Player, Análisis) ---
+        async function control(action) { try { await fetch(`/player/${action}`, { method: 'POST' }); setTimeout(actualizarPlayer, 500); } catch(e){} }
+        
+        async function actualizarPlayer() {
+            try {
+                const res = await fetch('/player/current');
+                const data = await res.json();
+                if(data && data.item) {
+                    document.getElementById('p-title').innerText = data.item.name;
+                    document.getElementById('p-artist').innerText = data.item.artists[0].name;
+                    document.getElementById('p-img').src = data.item.album.images[0].url;
+                    if(data.is_playing) { document.getElementById('btn-play').style.display='none'; document.getElementById('btn-pause').style.display='block'; }
+                    else { document.getElementById('btn-play').style.display='block'; document.getElementById('btn-pause').style.display='none'; }
+                }
+            } catch(e){}
+        }
+        setInterval(actualizarPlayer, 3000);
+        actualizarPlayer();
+
+        let chartInstance = null;
+        async function abrirAnalisis(titulo, id, duracionTexto) {
+            document.getElementById('modal-analisis').style.display = 'flex';
+            document.getElementById('analisis-titulo').innerText = `Analizando...`;
+            try {
+                const res = await fetch(`/web/analisis/${id}`);
+                const data = await res.json();
+                
+                const feat = data.features;
+                document.getElementById('analisis-titulo').innerText = titulo;
+                document.getElementById('val-tempo').innerText = Math.round(feat.tempo);
+                const notas = ['Do', 'Do#', 'Re', 'Re#', 'Mi', 'Fa', 'Fa#', 'Sol', 'Sol#', 'La', 'La#', 'Si'];
+                document.getElementById('val-key').innerText = notas[feat.key] || '?';
+                document.getElementById('val-duracion').innerText = duracionTexto;
+
+                if (data.total_markets) {
+                    document.getElementById('val-markets').innerText = `${data.total_markets} Países`;
+                    document.getElementById('flag-co').style.display = data.available_in_co ? 'inline' : 'none';
+                }
+
+                const ctx = document.getElementById('graficoRadar').getContext('2d');
+                if(chartInstance) chartInstance.destroy();
+                chartInstance = new Chart(ctx, {
+                    type: 'radar',
+                    data: {
+                        labels: ['Bailable', 'Energía', 'Positividad', 'Acústico', 'Instrumental', 'En Vivo'],
+                        datasets: [{ label: 'Nivel', data: [feat.danceability, feat.energy, feat.valence, feat.acousticness, feat.instrumentalness, feat.liveness], backgroundColor: 'rgba(29, 185, 84, 0.4)', borderColor: '#1DB954', borderWidth: 2, pointBackgroundColor: '#fff' }]
+                    },
+                    options: { maintainAspectRatio: false, scales: { r: { angleLines: { color: '#444' }, grid: { color: '#444' }, pointLabels: { color: '#fff', font: {size: 12} }, suggestedMin: 0, suggestedMax: 1, ticks: { display: false } } }, plugins: { legend: { display: false } } }
+                });
+            } catch(e) { alert("⚠️ " + e.message); document.getElementById('modal-analisis').style.display = 'none'; }
+        }
+
+
+        // 👇 REEMPLAZA ESTA FUNCIÓN EN EL SCRIPT DE playlist_detail.html 👇
+
+        async function importarCancion(artista) {
+            // Limpiamos el nombre del artista por si tiene caracteres raros
+            if(!artista) return;
+            
+            const confirmacion = confirm(`¿Quieres importar a "${artista}" a tu biblioteca local?`);
+            if(!confirmacion) return;
+
+            // Cambiar cursor para indicar que está pensando
+            document.body.style.cursor = 'wait';
+
+            try {
+                // encodeURIComponent es VITAL para nombres como "AC/DC" o "Tears for Fears"
+                const url = `/apis/importar/${encodeURIComponent(artista)}`;
+                
+                const res = await fetch(url, { method: 'POST' });
+                
+                if (!res.ok) {
+                    throw new Error(`Error del servidor: ${res.status}`);
+                }
+
+                const data = await res.json();
+                alert("✅ " + data.mensaje);
+                
+                // Opcional: Recargar para ver cambios
+                // location.reload(); 
+
+            } catch(e) {
+                console.error(e);
+                alert("❌ Hubo un problema al importar. Revisa la terminal negra para ver el error.");
+            } finally {
+                document.body.style.cursor = 'default';
+            }
+        }
+    </script>
+</body>
+</html>

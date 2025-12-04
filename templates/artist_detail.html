@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ artista.nombre }} - SONICORE</title>
+    <link href="{{ url_for('static', path='/styles.css') }}" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .artist-header { height: 350px; background: linear-gradient(to bottom, rgba(0,0,0,0.3), #121212), url('{{ artista.foto }}'); background-size: cover; background-position: center; display: flex; flex-direction: column; justify-content: flex-end; padding: 30px; }
+        .artist-name { font-size: 80px; font-weight: 900; color: white; margin: 0; line-height: 1; text-shadow: 0 4px 20px rgba(0,0,0,0.5); }
+        .content-wrapper { padding: 30px; background: #121212; min-height: 500px; }
+        .track-row { display: flex; align-items: center; padding: 10px; border-radius: 5px; color: #bbb; transition: 0.2s; cursor: pointer; }
+        .track-row:hover { background: rgba(255,255,255,0.1); color: white; }
+        .discography-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 20px; }
+        .album-card { background: #181818; padding: 15px; border-radius: 8px; transition: 0.3s; cursor: pointer; }
+        .album-card:hover { background: #282828; transform: translateY(-5px); }
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 5000; display: none; justify-content: center; align-items: center; }
+        .modal { background: #181818; color: #fff; padding: 20px; border-radius: 15px; width: 90%; max-width: 600px; border-top: 5px solid #1DB954; }
+    </style>
+</head>
+<body>
+    <div class="main-content" style="height:100vh; overflow-y:auto;">
+        <a href="/web/" style="position:absolute; top:20px; left:20px; color:white; font-size:30px; text-decoration:none; z-index:100; background:rgba(0,0,0,0.5); width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center;"><i class="fas fa-arrow-left"></i></a>
+
+        <div class="artist-header">
+            <h1 class="artist-name">{{ artista.nombre }}</h1>
+            <div style="color:white; margin-top:10px;">{{ artista.nacionalidad }} • {{ albumes|length }} Álbumes</div>
+        </div>
+
+        <div class="content-wrapper">
+            {% if canciones %}
+            <div style="margin-bottom: 40px;">
+                <h2 style="color:white; border-bottom:1px solid #333; padding-bottom:10px;">Populares</h2>
+                {% for cancion in canciones[:10] %}
+                {% set is_liked = cancion.id_cancion in mis_likes %}
+                <div class="track-row">
+                    <div style="width:30px; text-align:center;">{{ loop.index }}</div>
+                    <div style="flex:1; display:flex; flex-direction:column;">
+                        <span style="font-size:16px; font-weight:500; color:white;">{{ cancion.titulo }}</span>
+                    </div>
+
+                    <div style="display:flex; gap:15px; align-items:center; margin-right:20px;">
+                        <i class="fas fa-play-circle" onclick="control('play?uri={{ cancion.titulo }}')" style="color:var(--c-spotify); font-size:20px;"></i>
+
+                        <i class="fas fa-chart-pie" title="Analizar" style="color:var(--c-salmon); font-size:18px;"
+                           onclick="abrirAnalisis('{{ cancion.titulo | replace("'", "\\'") }}', '{{ cancion.id_cancion }}', '{{ cancion.duracion }}')"></i>
+
+                        <i class="{{ 'fas' if is_liked else 'far' }} fa-heart" title="Me Gusta"
+                           style="cursor:pointer; color: {{ 'var(--c-salmon)' if is_liked else 'gray' }}; font-size: 18px;"
+                           onclick="toggleLikeLocal(this, {{ cancion.id_cancion }})"></i>
+                    </div>
+
+                    <div style="width:50px; text-align:right;">{{ cancion.duracion }}</div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            {% if albumes %}
+            <div>
+                <h2 style="color:white; border-bottom:1px solid #333; padding-bottom:10px;">Discografía</h2>
+                <div class="discography-grid">
+                    {% for album in albumes %}
+                    <div class="album-card" onclick="window.location.href='/web/album/{{ album.id_album }}'">
+                        <img src="{{ album.foto_portada or 'https://via.placeholder.com/300' }}" style="width:100%; border-radius:5px; margin-bottom:10px;">
+                        <div style="font-weight:bold; color:white;">{{ album.nombre }}</div>
+                        <div style="color:#888; font-size:12px;">{{ album.anio_lanzamiento }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+
+            <div style="margin-top:40px; padding:20px; background:#222; border-radius:10px; color:#ddd; line-height:1.6;">
+                <h3 style="color:white;">Acerca de</h3>
+                <p>{{ artista.biografia or "Sin información." }}</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modal-analisis">
+        <div class="modal">
+            <h2 id="analisis-titulo" style="text-align:center;">Análisis</h2>
+            <div style="display:flex; justify-content:space-around; margin:15px 0; color:#bbb; font-size:14px;">
+                <div>🎹 BPM: <span id="val-tempo" style="color:white;">--</span></div>
+                <div>🎼 Tono: <span id="val-key" style="color:white;">--</span></div>
+                <div>⏱️ Duración: <span id="val-duracion" style="color:white;">--</span></div>
+            </div>
+            <div style="position:relative; width:100%; flex-grow:1; min-height:250px;"><canvas id="graficoRadar"></canvas></div>
+            <div style="display:flex; justify-content:center; margin-top:15px;">
+                <button onclick="document.getElementById('modal-analisis').style.display='none'" style="background:#555; color:white; border:none; padding:8px 15px; border-radius:5px; cursor:pointer;">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Scripts necesarios
+        async function control(action) { try { await fetch(`/player/${action}`, { method: 'POST' }); } catch(e){} }
+
+        async function toggleLikeLocal(btn, id) {
+            try {
+                const res = await fetch(`/web/like/${id}`, { method: 'POST' });
+                const data = await res.json();
+                if(data.es_favorito) { btn.classList.remove('far'); btn.classList.add('fas'); btn.style.color = 'var(--c-salmon)'; }
+                else { btn.classList.remove('fas'); btn.classList.add('far'); btn.style.color = 'gray'; }
+            } catch(e){}
+        }
+
+        let chartInstance = null;
+        async function abrirAnalisis(titulo, id, duracionTexto) {
+            document.getElementById('modal-analisis').style.display = 'flex';
+            document.getElementById('analisis-titulo').innerText = `Analizando...`;
+            try {
+                let spotifyId = id;
+                // Si es ID local (número), buscar en Spotify
+                if (!isNaN(id)) {
+                    const resSearch = await fetch(`/web/spotify_search_track?q=${encodeURIComponent(titulo)}`);
+                    const dataSearch = await resSearch.json();
+                    if(dataSearch.tracks && dataSearch.tracks.items.length > 0) spotifyId = dataSearch.tracks.items[0].id;
+                    else throw new Error("No encontrado en Spotify.");
+                }
+                const res = await fetch(`/web/analisis/${spotifyId}`);
+                const data = await res.json();
+                if(data.error) throw new Error(data.error);
+
+                const feat = data.features;
+                document.getElementById('analisis-titulo').innerText = titulo;
+                document.getElementById('val-tempo').innerText = Math.round(feat.tempo);
+                const notas = ['Do', 'Do#', 'Re', 'Re#', 'Mi', 'Fa', 'Fa#', 'Sol', 'Sol#', 'La', 'La#', 'Si'];
+                document.getElementById('val-key').innerText = notas[feat.key] || '?';
+                if(duracionTexto) document.getElementById('val-duracion').innerText = duracionTexto;
+
+                const ctx = document.getElementById('graficoRadar').getContext('2d');
+                if(chartInstance) chartInstance.destroy();
+                chartInstance = new Chart(ctx, {
+                    type: 'radar',
+                    data: {
+                        labels: ['Bailable', 'Energía', 'Positividad', 'Acústico', 'Instrumental', 'En Vivo'],
+                        datasets: [{ label: 'Nivel', data: [feat.danceability, feat.energy, feat.valence, feat.acousticness, feat.instrumentalness, feat.liveness], backgroundColor: 'rgba(29, 185, 84, 0.4)', borderColor: '#1DB954', borderWidth: 2 }]
+                    },
+                    options: { maintainAspectRatio: false, scales: { r: { angleLines: { color: '#444' }, grid: { color: '#444' }, pointLabels: { color: '#fff' }, suggestedMin: 0, suggestedMax: 1, ticks: { display: false } } }, plugins: { legend: { display: false } } }
+                });
+            } catch(e) { alert("⚠️ " + e.message); document.getElementById('modal-analisis').style.display = 'none'; }
+        }
+    </script>
+</body>
+</html>

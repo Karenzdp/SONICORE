@@ -1,0 +1,1507 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SONICORE</title>
+
+    <link href="{{ url_for('static', path='/styles.css') }}?v=NeonMegaFinal" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        /* ESTILO PARA LOS MENSAJES DE ERROR INTEGRADOS (TOASTS) */
+        .error-toast {
+            background: rgba(220, 20, 60, 0.2); /* Rojo carmesí transparente */
+            border: 1px solid #ff5555;
+            color: #ffcccc; /* Texto rosado claro */
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 13px;
+            margin-top: 10px;
+            margin-bottom: 10px;
+            text-align: center;
+            display: none; /* Oculto por defecto */
+            backdrop-filter: blur(4px);
+            box-shadow: 0 4px 15px rgba(255, 0, 0, 0.1);
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(-5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar" id="sidebar">
+        <div class="logo">
+            <i class="fas fa-wave-square"></i> <span>SONICORE</span>
+        </div>
+
+        <nav class="nav-menu">
+            <div class="nav-label">DESCUBRIR</div>
+            <a href="/web/?filtro=inicio" class="nav-item {% if filtro_actual == 'inicio' %}active{% endif %}">
+                <i class="fas fa-home"></i> Inicio
+            </a>
+            <a href="/web/?filtro=explorar" class="nav-item {% if filtro_actual == 'explorar' %}active{% endif %}">
+                <i class="fas fa-compass"></i> Explorar
+            </a>
+            <a href="/web/?filtro=generos" class="nav-item {% if filtro_actual == 'generos' %}active{% endif %}">
+                <i class="fas fa-bolt"></i> Géneros
+            </a>
+
+            <div class="nav-label">TU BIBLIOTECA</div>
+            <a href="/web/?filtro=artistas" class="nav-item {% if filtro_actual == 'artistas' %}active{% endif %}">
+                <i class="fas fa-microphone"></i> Artistas
+            </a>
+            <a href="/web/?filtro=albunes" class="nav-item {% if filtro_actual == 'albunes' %}active{% endif %}">
+                <i class="fas fa-compact-disc"></i> Álbumes
+            </a>
+            <a href="/web/?filtro=canciones" class="nav-item {% if filtro_actual == 'canciones' %}active{% endif %}">
+                <i class="fas fa-music"></i> Canciones
+            </a>
+
+            <div class="nav-label">MIS ARTISTAS</div>
+            <div style="max-height: 150px; overflow-y: auto;">
+                {% for artista in mis_artistas %}
+                    <a href="#" onclick="verArtista('{{ artista.id_artista }}')" class="nav-item" style="padding: 5px 15px; font-size: 13px;">
+                        <img src="{{artista.foto or ''}}" style="width:20px; height:20px; border-radius:50%; object-fit:cover; margin-right:5px;">
+                        {{ artista.nombre }}
+                    </a>
+                {% endfor %}
+            </div>
+        </nav>
+
+        <button class="btn-playlist" onclick="alert('Función crear playlist pronto...')">+ Nueva Playlist</button>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="main-content">
+
+        <!-- HEADER / SEARCH -->
+        <header class="top-bar">
+            <div class="search-bar">
+                <i class="fas fa-search"></i>
+                <input type="text" id="nav-search" placeholder="Buscar canciones, artistas..."
+                       value="{{ busqueda or '' }}" autocomplete="off"
+                       onkeyup="buscarSugerencias(this.value, 'suggestions-nav')"
+                       onkeypress="if(event.key === 'Enter') realizarBusqueda(this.value)">
+                <div id="suggestions-nav" class="suggestions-box"></div>
+            </div>
+
+            <div class="user-area">
+                <a href="/spotify/login" class="btn-spotify">
+                    <i class="fab fa-spotify"></i> Conectar
+                </a>
+                <div class="profile-pic" title="{{ usuario or 'Invitado' }}">
+                    <i class="fas fa-user"></i>
+                </div>
+                {% if usuario %}
+                    <a href="/web/logout" style="color:var(--c-pink); font-size:12px; text-decoration:none;"><i class="fas fa-sign-out-alt"></i></a>
+                {% else %}
+                    <a href="/web/login" style="color:white; font-size:12px; text-decoration:none;">Login</a>
+                {% endif %}
+            </div>
+        </header>
+
+        <div class="scroll-container">
+
+            <!-- VISTA: INICIO -->
+            {% if filtro_actual == 'inicio' and not busqueda %}
+
+                <div class="hero-card">
+                    {% set bg_class = 'grad-jshine' %}
+                    {% if insights and insights.energia %}
+                        {% if insights.energia.tu_energia > 0.65 %}
+                            {% set bg_class = 'grad-jshine' %}
+                        {% else %}
+                            {% set bg_class = 'grad-blues' %}
+                        {% endif %}
+                    {% endif %}
+
+                    <div style="position:absolute; top:0; left:0; width:100%; height:100%; background: var(--{{ bg_class }}); z-index:1;"></div>
+
+                    <div class="hero-content" style="position:relative; z-index:2;">
+                        {% if insights and insights.energia %}
+                            <span class="tag"><i class="fas fa-chart-line"></i> TU ADN MUSICAL</span>
+                            <h1 style="font-size: 42px; margin: 10px 0;">{{ insights.energia.mensaje }}</h1>
+                            <p style="font-size: 16px; opacity: 0.9; max-width: 500px;">
+                                Estás en <strong>{{ insights.energia.tu_energia }}</strong> de intensidad vs el promedio mundial de <strong>{{ insights.energia.global_energia }}</strong>.
+                                {% if insights.horario.porcentaje_noche > 20 %}
+                                    <br>🌙 Además, eres un animal nocturno ({{ insights.horario.porcentaje_noche }}% actividad noche).
+                                {% endif %}
+                            </p>
+                            <div class="hero-actions">
+                                <button class="btn-play-hero" onclick="control('play')">Seguir Escuchando</button>
+                                <button class="btn-follow-hero">Ver Estadísticas</button>
+                            </div>
+                        {% elif insights and insights.explorador.score > 2 %}
+                            <span class="tag">#EXPLORADOR</span>
+                            <h1>¡Estás ampliando<br>horizontes!</h1>
+                            <p>{{ insights.explorador.mensaje }}</p>
+                            <div class="hero-actions">
+                                <button class="btn-play-hero" onclick="control('play')">Descubrir Más</button>
+                            </div>
+                        {% else %}
+                            <span class="tag">#1 EN TENDENCIAS</span>
+                            <h1>Descubre tu<br>Nuevo Ritmo</h1>
+                            <p>Las mejores mezclas seleccionadas para ti. Empieza a escuchar música para generar tus estadísticas.</p>
+                            <div class="hero-actions">
+                                <button class="btn-play-hero" onclick="control('play')">Reproducir</button>
+                                <button class="btn-follow-hero">Explorar</button>
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="hero-art-icon" style="z-index:2;">
+                        {% if insights and insights.energia %} <i class="fas fa-bolt"></i>
+                        {% elif insights %} <i class="fas fa-globe-americas"></i>
+                        {% else %} <i class="fas fa-music"></i> {% endif %}
+                    </div>
+                </div>
+
+                <div class="section">
+                    <h3>Artistas Destacados</h3>
+                    <div class="artist-circles">
+                        {% for artista in mis_artistas %}
+                        <div class="circle-item" onclick="verArtista('{{ artista.id_artista }}')">
+                            <img src="{{ artista.foto or 'https://via.placeholder.com/150' }}" alt="{{ artista.nombre }}">
+                            <span>{{ artista.nombre }}</span>
+                        </div>
+                        {% endfor %}
+                        <div class="circle-item" onclick="abrirFormularioArtista()">
+                            <div class="circle-ph ph-2" style="display:flex; align-items:center; justify-content:center; font-size:30px;">+</div>
+                            <span>Nuevo</span>
+                        </div>
+                    </div>
+                </div>
+
+                {% if favoritos %}
+                <div class="section">
+                    <h3>Tus Me Gusta <i class="fas fa-heart" style="color:var(--c-pink)"></i></h3>
+                    <div class="track-list">
+                        {% for cancion in favoritos %}
+                        <div class="track-row">
+                            <div class="track-img" onclick="control('play?uri={{ cancion.titulo }}')"><i class="fas fa-play"></i></div>
+                            <div class="track-info">
+                                <div class="t-name">{{ cancion.titulo }}</div>
+                                <div class="t-artist">Local</div>
+                            </div>
+                            <div class="track-meta">
+                                <span>{{ cancion.duracion }}</span>
+                                <i class="fas fa-chart-pie" onclick="abrirAnalisis('{{ cancion.titulo }}', '{{ cancion.id_cancion }}', '{{ cancion.duracion }}')" style="cursor:pointer; margin-right:10px; color:#888;"></i>
+                                <i class="fas fa-heart liked" onclick="toggleLikeLocal(this, {{ cancion.id_cancion }})"></i>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+            {% endif %}
+
+            <!-- VISTAS GRID -->
+            {% if filtro_actual == 'artistas' or artistas %}
+                <div class="section">
+                    <h3>
+                        Artistas
+                        {% if filtro_actual == 'artistas' %}<button class="btn-play-hero" style="font-size:12px; padding:5px 15px;" onclick="abrirFormularioArtista()">+ Nuevo</button>{% endif %}
+                    </h3>
+                    <div class="cards-grid">
+                        {% for artista in artistas %}
+                        {% set id = artista.id_artista or artista.id %}
+                        {% set is_local = artista.id_artista is defined %}
+                        <div class="card" style="text-align: center;" onclick="{% if not is_local %}gestionarClick('artist', '{{ id }}', true){% else %}verArtista('{{ id }}'){% endif %}">
+                            <img src="{{ artista.foto or 'https://via.placeholder.com/300' }}" style="border-radius:50%;">
+                            <div class="card-title">{{ artista.nombre }}</div>
+                            <small style="color:var(--text-gray)">{{ artista.nacionalidad }}</small>
+                            {% if not is_local %}<div style="color:var(--c-pink); font-size:10px; margin-top:5px;">Importar</div>{% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            {% endif %}
+
+            <!-- AQUÍ ESTÁ EL CAMBIO EN ÁLBUMES: SIN BOTONES FLOTANTES -->
+            {% if filtro_actual == 'albunes' or albumes %}
+                <div class="section">
+                    <h3>Álbumes {% if filtro_actual == 'albunes' %}<button class="btn-play-hero" style="font-size:12px; padding:5px 15px;" onclick="abrirFormularioAlbum()">+ Nuevo</button>{% endif %}</h3>
+                    <div class="cards-grid">
+                        {% for album in albumes %}
+                        {% set id = album.id_album or album.id %}
+                        {% set is_local = album.id_album is defined %}
+                        <div class="card">
+                            <div style="position:relative;">
+                                <!-- Solo la imagen, al hacer clic abre el modal -->
+                                <img src="{{ album.images[0].url if album.images else (album.foto_portada or 'https://via.placeholder.com/300') }}" onclick="{% if not is_local %}gestionarClick('album', '{{ id }}', true){% else %}verAlbum('{{ id }}'){% endif %}">
+                            </div>
+                            <div class="card-title">{{ album.name or album.nombre }}</div>
+                            <small style="color:var(--text-gray)">{{ album.release_date or album.anio_lanzamiento }}</small>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            {% endif %}
+
+            {% if generos %}
+                <div class="section">
+                    <h3>
+                        Géneros
+                        {% if filtro_actual == 'generos' %}<button class="btn-play-hero" style="font-size:12px; padding:5px 15px;" onclick="document.getElementById('modal-genero-form').style.display='flex'">+ Nuevo</button>{% endif %}
+                    </h3>
+                    <div class="cards-grid">
+                        {% for item in generos %}
+                            {% set ciclo = loop.index0 % 3 %}
+                            {% set grad = 'grad-blues' if ciclo == 0 else 'grad-jshine' if ciclo == 1 else 'grad-amin' %}
+
+                            <!-- Tarjeta con posición relativa para el botón flotante -->
+                            <div class="card-genre {{ grad }}" onclick="window.location.href='/web/?filtro=playlists&category_id={{ item.id_genero or item.id }}&category_name={{ item.nombre or item.name }}'" style="position: relative;">
+                                {{ item.nombre or item.name }}
+
+                                <!-- BOTÓN DE INFORMACIÓN (Solo si es local 'id_genero') -->
+                                {% if item.id_genero is defined %}
+                                <div onclick="event.stopPropagation(); verInfoGenero('{{ item.id_genero }}')"
+                                     style="position: absolute; top: 5px; right: 5px; width: 25px; height: 25px; background: rgba(0,0,0,0.3); border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 10; transition: 0.2s;">
+                                    <i class="fas fa-info" style="font-size: 12px; color: white;"></i>
+                                </div>
+                                {% endif %}
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            {% endif %}
+
+            {% if canciones %}
+                <div class="section">
+                    <h3>
+                        Canciones
+                        {% if filtro_actual == 'canciones' %}<button class="btn-play-hero" style="font-size:12px; padding:5px 15px;" onclick="document.getElementById('modal-cancion-form').style.display='flex'">+ Nueva</button>{% endif %}
+                    </h3>
+                    <div class="track-list">
+                        {% for cancion in canciones %}
+                        {% set is_liked = cancion.id_cancion in mis_likes %}
+                        {% set id_final = cancion.id_cancion if cancion.id_cancion else cancion.id %}
+                        <div class="track-row">
+                            <div class="track-img" onclick="control('play?uri={{ cancion.titulo }}')"><i class="fas fa-play"></i></div>
+                            <div class="track-info">
+                                <div class="t-name">{{ cancion.titulo }}</div>
+                                <div class="t-artist">ID: {{ id_final }}</div>
+                            </div>
+                            <div class="track-meta">
+                                <span>{{ cancion.duracion }}</span>
+                                <i class="{{ 'fas' if is_liked else 'far' }} fa-heart" style="color:{{ 'var(--c-pink)' if is_liked else 'gray' }}; cursor:pointer;" onclick="toggleLikeLocal(this,{{ id_final }})"></i>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            {% endif %}
+
+            {% if busqueda and not artistas and not albumes and not canciones and not generos %}
+                <div style="text-align:center; margin-top:50px;">
+                    <h2 style="color:white;">No encontrado en local</h2>
+                    <button class="btn-spotify" style="margin: 20px auto;" onclick="importarAutomatico('{{ busqueda }}')">
+                        <i class="fab fa-spotify"></i> Importar "{{ busqueda }}"
+                    </button>
+                </div>
+            {% endif %}
+
+        </div>
+    </main>
+
+    <!-- REPRODUCTOR FLOTANTE -->
+    <div class="floating-player-container">
+        <div class="glass-player">
+            <div class="fp-left">
+                <img id="p-img" src="https://via.placeholder.com/50" class="fp-cover">
+                <div class="fp-info">
+                    <div id="p-title" class="fp-title">Selecciona canción</div>
+                    <div id="p-artist" class="fp-artist">--</div>
+                </div>
+            </div>
+            <div class="fp-center">
+                <div class="fp-controls">
+                    <button onclick="control('prev')"><i class="fas fa-step-backward"></i></button>
+                    <button class="play-btn-circle" id="btn-play" onclick="control('play')"><i class="fas fa-play"></i></button>
+                    <button class="play-btn-circle" id="btn-pause" onclick="control('pause')" style="display:none;"><i class="fas fa-pause"></i></button>
+                    <button onclick="control('next')"><i class="fas fa-step-forward"></i></button>
+                </div>
+            </div>
+            <div class="fp-right">
+                <i class="fas fa-volume-up"></i>
+                <input type="range" class="vol-slider" min="0" max="100" value="50" onchange="control('volume/'+this.value)">
+            </div>
+        </div>
+    </div>
+
+    <!-- =================================================================
+         ZONA DE MODALES
+         ================================================================= -->
+
+    <!-- 1. MODAL ARTISTA (VER) - Glass -->
+    <div class="modal-overlay" id="modal-artista">
+        <div class="modal" id="modal-artista-content" style="background: #121212; width: 95%; max-width: 900px; border-top:none; height: 85vh; display:flex; flex-direction:column;"></div>
+    </div>
+
+    <!-- 2. MODAL ÁLBUM (VER + EDITAR) - Glass Nuevo -->
+    <div class="modal-overlay" id="modal-album">
+        <div class="modal" id="modal-album-content" style="background: transparent; box-shadow: none; border: none;"></div>
+    </div>
+    <!-- PEGA ESTO EN TU HTML SI TE FALTABA -->
+    <div class="modal-overlay" id="modal-info-genero">
+        <div class="modal" id="modal-info-genero-content" style="background: transparent; box-shadow: none; border: none;">
+        </div>
+    </div>
+
+    <!-- 3. MODAL PLAYLIST (RESTAURADO) -->
+    <div class="modal-overlay" id="modal-playlist">
+        <div class="modal" style="background: #181818; padding: 20px;">
+            <div id="pl-header" style="height: 150px; display: flex; align-items: end; gap: 20px;">
+                <img id="pl-img" src="" style="width: 150px; height: 150px; border-radius: 10px;">
+                <div>
+                    <h1 id="pl-nombre" style="font-size: 30px; margin: 0;">Playlist</h1>
+                    <p id="pl-desc" style="color: #ccc;">...</p>
+                </div>
+                <button onclick="document.getElementById('modal-playlist').style.display='none'" style="margin-left:auto; background:none; border:none; color:white; font-size:20px; cursor:pointer;">&times;</button>
+            </div>
+            <div style="margin-top: 20px; max-height: 400px; overflow-y: auto;">
+                <div id="pl-tracks"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. MODAL GESTIÓN ARTISTA (Crear/Editar) -->
+    <div class="modal-overlay" id="modal-artista-form" style="z-index: 6000;">
+        <div class="modal modal-small" style="max-width: 800px; max-height: 90vh; overflow-y: auto; background-color: #181818; border-top: 5px solid #8e2de2;">
+            <div style="position: sticky; top:0; background:#181818; padding:20px 0; z-index:10; border-bottom: 1px solid #333;">
+                <h2 style="text-align:center; color:white; margin:0;">Gestión Artista</h2>
+            </div>
+            <div style="padding: 20px; display: flex; flex-direction: column; gap: 20px;">
+                <input type="hidden" id="art-id-form">
+                <input type="text" id="art-nombre-form" class="modal-input" placeholder="Nombre Artista *">
+                <input type="text" id="art-nacionalidad-form" class="modal-input" placeholder="País">
+                <input type="file" id="art-foto-file" class="modal-input">
+                <input type="text" id="art-bio-form" class="modal-input" placeholder="Biografía">
+                <textarea id="art-top-canciones" class="modal-input" style="height:60px;" placeholder="Canciones Populares..."></textarea>
+                <div style="background: #222; padding: 10px; border-radius: 8px;">
+                    <button onclick="abrirSubModalAlbum()" style="background:var(--grad-blues); color:white; border:none; padding:5px 10px; border-radius:5px;">+ Agregar Álbum</button>
+                    <div id="lista-visual-albumes" style="margin-top:10px;"></div>
+                </div>
+                <div id="art-form-error" class="error-toast"></div>
+            </div>
+            <div class="modal-buttons" style="padding:20px; border-top: 1px solid #333;">
+                <button class="btn-cancel" onclick="document.getElementById('modal-artista-form').style.display='none'">Cancelar</button>
+                <button onclick="guardarCambiosTotales()" style="background:var(--grad-amin); color:white; border:none; padding:10px 30px; border-radius:30px;">💾 GUARDAR TODO</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 5. MODAL SUB ALBUM (Para Artista) -->
+    <div class="modal-overlay" id="modal-sub-album" style="z-index: 7000;">
+        <div class="modal modal-small" style="max-width: 500px; border: 2px solid #8e2de2;">
+            <h3 style="text-align:center; color:#8e2de2;">💿 Detalle del Álbum</h3>
+            <div style="padding:15px; display:flex; flex-direction:column; gap:15px;">
+                <input type="text" id="sub-alb-titulo" class="modal-input" placeholder="Título *">
+                <input type="number" id="sub-alb-anio" class="modal-input" placeholder="Año">
+                <input type="file" id="sub-alb-file" class="modal-input">
+                <textarea id="sub-alb-canciones" class="modal-input" style="height:100px;" placeholder="Canciones..."></textarea>
+                <div id="sub-alb-error" class="error-toast"></div>
+            </div>
+            <div class="modal-buttons">
+                <button class="btn-cancel" onclick="document.getElementById('modal-sub-album').style.display='none'">Cancelar</button>
+                <button onclick="confirmarAlbum()" style="background:#8e2de2; color:white; border:none; padding:10px 20px; border-radius:5px;">✅ Confirmar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 6. MODAL ALBUM SIMPLE (Crear suelto) -->
+    <div class="modal-overlay" id="modal-album-form">
+        <div class="modal modal-small">
+            <h2 id="form-alb-titulo">Álbum</h2>
+            <input type="hidden" id="alb-id-form">
+            <input type="text" id="alb-nombre" class="modal-input" placeholder="Título *">
+            <div style="display:flex; gap:10px;">
+                <input type="number" id="alb-anio" class="modal-input" placeholder="Año">
+                <input type="number" id="alb-artista-id" class="modal-input" placeholder="ID Artista (Opcional)">
+            </div>
+            <input type="text" id="alb-foto" class="modal-input" placeholder="URL Portada">
+            <textarea id="alb-desc" class="modal-input" placeholder="Descripción"></textarea>
+            <!-- ÁREA DE CANCIONES -->
+            <div style="margin-top:10px;">
+                <label style="color:#aaa; font-size:12px;">Canciones (Nombre Duración):</label>
+                <textarea id="alb-tracks-area" class="modal-input" style="height:80px; font-family:monospace;" placeholder="Canción 1 (3:20)&#10;Canción 2 (4:05)"></textarea>
+            </div>
+            <div id="alb-error-msg" class="error-toast"></div>
+            <div class="modal-buttons">
+                <button onclick="document.getElementById('modal-album-form').style.display='none'" class="btn-cancel">Cancelar</button>
+                <button onclick="guardarAlbum()" style="background:var(--grad-jshine); border:none; padding:10px 20px; border-radius:5px;">Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 7. MODAL CREAR GÉNERO (RESTAURADO) -->
+    <div class="modal-overlay" id="modal-genero-form">
+        <div class="modal modal-small">
+            <h2 id="form-gen-titulo">Nuevo Género</h2>
+            <input type="hidden" id="gen-id">
+            <input type="text" id="gen-nombre" class="modal-input" placeholder="Nombre">
+            <textarea id="gen-desc" class="modal-input" placeholder="Descripción"></textarea>
+            <div class="modal-buttons">
+                <button onclick="document.getElementById('modal-genero-form').style.display='none'" class="btn-cancel">Cancelar</button>
+                <button onclick="guardarGenero()" style="background:var(--c-spotify); border:none; padding:10px 20px; border-radius:5px; font-weight:bold;">Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 8. MODAL CREAR CANCIÓN (RESTAURADO) -->
+    <div class="modal-overlay" id="modal-cancion-form">
+        <div class="modal modal-small">
+            <h2 id="form-can-titulo">Canción</h2>
+            <input type="hidden" id="can-id-form">
+            <input type="text" id="can-titulo" class="modal-input" placeholder="Título">
+            <div style="display:flex; gap:10px;">
+                <input type="text" id="can-duracion" class="modal-input" placeholder="Duración (3:45)">
+                <input type="number" id="can-anio" class="modal-input" placeholder="Año">
+            </div>
+            <div style="display:flex; gap:10px;">
+                <input type="number" id="can-artista-id" class="modal-input" placeholder="ID Artista">
+                <input type="number" id="can-album-id" class="modal-input" placeholder="ID Álbum">
+            </div>
+            <div class="modal-buttons">
+                <button onclick="document.getElementById('modal-cancion-form').style.display='none'" class="btn-cancel">Cancelar</button>
+                <button onclick="guardarCancion()" style="background:var(--c-spotify); border:none; padding:10px 20px; border-radius:5px; font-weight:bold;">Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 9. MODAL ANÁLISIS -->
+    <div class="modal-overlay" id="modal-analisis">
+        <div class="modal modal-small" style="border-top: 5px solid #1DB954;">
+            <h2 id="analisis-titulo" style="color:white; text-align:center;">Análisis</h2>
+            <div style="display:flex; justify-content:space-around; margin:15px 0;">
+                <div>BPM: <span id="val-tempo">--</span></div>
+                <div>Key: <span id="val-key">--</span></div>
+                <div>Dur: <span id="val-duracion">--</span></div>
+            </div>
+            <div style="height:300px;"><canvas id="graficoRadar"></canvas></div>
+            <div class="modal-buttons">
+                <button class="btn-cancel" onclick="document.getElementById('modal-analisis').style.display='none'">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+                // ==========================================
+                // VARIABLES GLOBALES (CONSOLIDADAS)
+                // ==========================================
+        // 1. VARIABLES GLOBALES
+        // ==========================================
+        let listaAlbumsCache = [];
+        let artistaActual = {};
+        let albumsEliminados = [];
+        let albumActual = {};
+        let generoActual = {};
+        let modoEdicion = false;
+        let esCreacion = false;
+        let modoEdicionAlbum = false;
+        let modoEdicionGenero = false;
+
+        // ==========================================
+        // 2. TELEMETRÍA Y UTILIDADES
+        // ==========================================
+        async function trackEvent(tipo, data) {
+            try {
+                await fetch('/analytics/track', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ type: tipo, data: data })
+                });
+            } catch (e) { console.warn("Analytics error:", e); }
+        }
+        const UI_ICONS = {
+            edit: 'fas fa-pen', delete: 'fas fa-trash', camera: 'fas fa-camera',
+            close: 'fas fa-times', save: 'fas fa-check', cancel: 'fas fa-times',
+            artist: 'fas fa-microphone-alt', album: 'fas fa-compact-disc', song: 'fas fa-music'
+        };
+        function mostrarExito(mensaje) {
+            const existing = document.getElementById('success-toast');
+            if (existing) existing.remove();
+            const div = document.createElement('div');
+            div.id = 'success-toast';
+            div.style.cssText = `position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.9); background: rgba(20, 20, 25, 0.95); border: 1px solid #1DB954; color: white; padding: 20px 40px; border-radius: 50px; box-shadow: 0 10px 40px rgba(29, 185, 84, 0.3); z-index: 10000; font-family: 'Poppins', sans-serif; font-weight: 600; font-size: 16px; display: flex; align-items: center; gap: 15px; opacity: 0; transition: all 0.3s; backdrop-filter: blur(10px);`;
+            div.innerHTML = `<i class="${UI_ICONS.save}" style="color:#1DB954; font-size:24px;"></i> ${mensaje}`;
+            document.body.appendChild(div);
+            requestAnimationFrame(() => { div.style.opacity = '1'; div.style.transform = 'translate(-50%, -50%) scale(1)'; });
+            setTimeout(() => { div.style.opacity = '0'; div.style.transform = 'translate(-50%, -50%) scale(0.9)'; setTimeout(() => div.remove(), 300); }, 2000);
+        }
+
+        function validarEntradas(texto, tipo = 'texto') {
+            if (!texto || texto.toString().trim().length === 0) return false;
+            if (tipo === 'anio') {
+                const anio = parseInt(texto);
+                const anioActual = new Date().getFullYear();
+                return !isNaN(anio) && anio >= 1800 && anio <= anioActual;
+            }
+            return true;
+        }
+
+        function mostrarError(elementId, mensaje) {
+            const el = document.getElementById(elementId);
+            if(el) {
+                el.innerText = "⚠️ " + mensaje;
+                el.style.display = 'block';
+                // Animación de sacudida
+                el.animate([
+                    { transform: 'translateX(0)' }, { transform: 'translateX(-5px)' },
+                    { transform: 'translateX(5px)' }, { transform: 'translateX(0)' }
+                ], { duration: 200 });
+                setTimeout(() => { el.style.display = 'none'; }, 4000);
+            } else { alert(mensaje); }
+        }
+
+        window.addEventListener('load', () => {
+            const params = new URLSearchParams(window.location.search);
+            const filtro = params.get('filtro') || 'inicio';
+            if (typeof trackEvent === "function") trackEvent('view_section', { section: filtro });
+        });
+
+        // ==========================================
+        // 3. BÚSQUEDA Y REPRODUCTOR
+        // ==========================================
+        const originalRealizarBusqueda = window.realizarBusqueda;
+        window.realizarBusqueda = function(texto) {
+            if(texto.trim()) {
+                window.location.href = `/web/?q=${encodeURIComponent(texto)}`;
+                trackEvent('search', { term: texto });
+            }
+        };
+
+        let timeoutBusqueda = null;
+        async function buscarSugerencias(texto, divId) {
+            const box = document.getElementById(divId);
+            if (texto.length < 2) { box.style.display = 'none'; return; }
+            clearTimeout(timeoutBusqueda);
+            timeoutBusqueda = setTimeout(async () => {
+                try {
+                    const res = await fetch(`/web/sugerencias?q=${encodeURIComponent(texto)}`);
+                    const data = await res.json();
+                    if (data.length > 0) {
+                        box.innerHTML = '';
+                        data.forEach(item => {
+                            const div = document.createElement('div'); div.className = 'suggestion-item';
+                            div.onclick = () => { document.getElementById('nav-search').value = item.nombre; window.realizarBusqueda(item.nombre); };
+                            let icon = item.tipo === 'Artista' ? 'fa-microphone-alt' : 'fa-music';
+                            div.innerHTML = `<div class="sugg-icon"><i class="fas ${icon}"></i></div><div>${item.nombre} <span style="font-size:11px; color:#c9b083;">• ${item.tipo}</span></div>`;
+                            box.appendChild(div);
+                        });
+                        box.style.display = 'block';
+                    } else box.style.display = 'none';
+                } catch (e) {}
+            }, 400);
+        }
+        document.addEventListener('click', (e) => { if (!e.target.closest('.search-bar')) document.querySelectorAll('.suggestions-box').forEach(b => b.style.display = 'none'); });
+
+        async function control(action) {
+            if (action.includes('play')) {
+                const trackTitle = document.getElementById('p-title')?.innerText || "Desconocido";
+                trackEvent('play', { track: trackTitle, raw_action: action });
+            }
+            try { await fetch(`/player/${action}`, { method: 'POST' }); setTimeout(actualizarPlayer, 500); } catch(e){}
+        }
+
+        async function actualizarPlayer() {
+            try {
+                const res = await fetch('/player/current');
+                const data = await res.json();
+                if(data && data.item) {
+                    document.getElementById('p-title').innerText = data.item.name;
+                    document.getElementById('p-artist').innerText = data.item.artists[0].name;
+                    document.getElementById('p-img').src = data.item.album.images[0].url;
+                    const btnPlay = document.getElementById('btn-play');
+                    const btnPause = document.getElementById('btn-pause');
+                    if(btnPlay && btnPause) {
+                        if(data.is_playing) { btnPlay.style.display='none'; btnPause.style.display='flex'; }
+                        else { btnPlay.style.display='flex'; btnPause.style.display='none'; }
+                    }
+                }
+            } catch(e){}
+        }
+        setInterval(actualizarPlayer, 3000);
+
+        // ==========================================
+        // 4. GESTIÓN DE ARTISTAS (DISEÑO GLASS) - CORREGIDO
+        // ==========================================
+        async function verArtista(id) {
+            trackEvent('view_artist', { artist_id: id });
+
+            const overlay = document.getElementById('modal-artista');
+            const content = document.getElementById('modal-artista-content');
+
+            // Centrar modal
+            overlay.style.display = 'flex';
+            overlay.style.justifyContent = 'center';
+            overlay.style.alignItems = 'center';
+            content.innerHTML = '<div style="color:white; font-size:20px;">Cargando perfil...</div>';
+
+            try {
+                const res = await fetch(`/web/api/artist_data/${id}`);
+                const data = await res.json();
+
+                if(data.error) throw new Error(data.error);
+
+                artistaActual = data;
+                artistaActual.id = id;
+                artistaActual.es_local = !isNaN(id); // Determina si es local o de Spotify
+                modoEdicion = false;
+                esCreacion = false;
+
+                renderizarInterfazArtista();
+            } catch(e) {
+                console.error(e);
+                content.innerHTML = `<div style="color:red; text-align:center;">Error: ${e.message}</div>`;
+            }
+        }
+
+        function renderizarInterfazArtista() {
+            const data = artistaActual;
+            const overlay = document.getElementById('modal-artista');
+            const content = document.getElementById('modal-artista-content');
+
+            // Reset estilos contenedor
+            content.style.background = 'transparent';
+            content.style.boxShadow = 'none';
+            content.style.border = 'none';
+            content.style.padding = '0';
+
+            const glassCSS = `
+                <style>
+                    .am-glass-card { display: flex; width: 900px; height: 550px; border-radius: 20px; position: relative; overflow: hidden; box-shadow: 0 50px 100px -20px rgba(0,0,0,0.8); border: 1px solid rgba(255,255,255,0.15); background: #101010; font-family: 'Poppins', sans-serif; }
+                    .am-bg-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-size: cover; background-position: center; filter: blur(60px) brightness(0.25); transform: scale(1.2); z-index: 0; }
+                    .am-layout { display: flex; width: 100%; height: 100%; z-index: 1; position: relative; }
+
+                    /* IZQUIERDA */
+                    .am-col-left { width: 320px; padding: 40px 30px; display: flex; flex-direction: column; align-items: center; background: rgba(255,255,255,0.02); border-right: 1px solid rgba(255,255,255,0.05); }
+                    .am-photo-frame { width: 220px; height: 220px; border-radius: 12px; overflow: hidden; margin-bottom: 25px; box-shadow: 0 10px 40px rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); position: relative; }
+                    .am-photo { width: 100%; height: 100%; object-fit: cover; transition: 0.3s; }
+                    .am-name { font-size: 36px; font-weight: 700; text-align: center; color: white; line-height: 1.1; margin-bottom: 5px; text-shadow: 0 2px 10px rgba(0,0,0,0.5); }
+                    .am-meta { font-size: 13px; color: rgba(255,255,255,0.6); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 10px; }
+
+                    /* DERECHA */
+                    .am-col-right { flex: 1; padding: 40px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.1) transparent; }
+                    .am-section-title { font-size: 14px; font-weight: 700; color: rgba(255,255,255,0.9); margin-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px; margin-top: 30px; }
+                    .am-section-title:first-child { margin-top: 0; }
+
+                    /* LISTAS */
+                    .am-track-row { display: flex; align-items: center; padding: 10px; border-radius: 8px; font-size: 14px; color: rgba(255,255,255,0.8); transition: 0.2s; border-bottom: 1px solid rgba(255,255,255,0.02); }
+                    .am-track-row:hover { background: rgba(255,255,255,0.05); }
+                    .am-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 15px; }
+                    .am-alb-item { text-align: center; cursor: pointer; transition: 0.2s; }
+                    .am-alb-item:hover { transform: translateY(-5px); }
+                    .am-alb-cover { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 6px; margin-bottom: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
+                    .am-alb-name { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: white; }
+
+                    /* BOTONES */
+                    .btn-glass-close { position: absolute; top: 20px; right: 20px; background: rgba(255,255,255,0.1); border: none; color: rgba(255,255,255,0.8); width: 32px; height: 32px; border-radius: 50%; cursor: pointer; z-index: 100; display: flex; align-items: center; justify-content: center; }
+                    .btn-glass-close:hover { background: rgba(255,255,255,0.3); color: white; }
+                    .am-actions { margin-top: auto; display: flex; gap: 15px; z-index: 10; }
+                    .btn-action-mini { width: 40px; height: 40px; border-radius: 50%; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: rgba(255,255,255,0.7); cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; }
+                    .btn-action-mini:hover { background: white; color: black; }
+
+                    /* INPUTS */
+                    .glass-input { background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.2); color: white; padding: 8px; border-radius: 6px; width: 100%; text-align: center; margin-bottom: 5px; }
+                    .glass-textarea { width: 100%; height: 100px; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 6px; padding: 10px; font-family: monospace; }
+                    .overlay-edit { position: absolute; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; opacity: 0; transition: 0.2s; cursor: pointer; }
+                    .am-photo-frame:hover .overlay-edit { opacity: 1; }
+                </style>
+            `;
+
+            let leftContent = '', rightContent = '';
+            const fotoUrl = data.foto || 'https://via.placeholder.com/300';
+
+            if (!modoEdicion) {
+                // MODO VER
+                leftContent = `
+                    <div class="am-photo-frame"><img src="${fotoUrl}" class="am-photo"></div>
+                    <div class="am-name">${data.nombre}</div>
+                    <div class="am-meta">${data.nacionalidad || 'Artista'}</div>
+                    ${data.es_local ? `
+                    <div class="am-actions">
+                        <button class="btn-action-mini" onclick="activarEdicion()" title="Editar"><i class="fas fa-pen"></i></button>
+                        <button class="btn-action-mini" onclick="eliminarItem('artistas', '${data.id}')" style="background:#ff5555;"><i class="fas fa-trash"></i></button>
+                    </div>` : ''}
+                `;
+
+                const tracksHTML = (data.canciones || []).slice(0,5).map((c,i) => `
+                    <div class="am-track-row">
+                        <div style="width:30px; opacity:0.5; font-weight:bold;">${i+1}</div>
+                        <div style="flex:1; font-weight:500;">${c.titulo}</div>
+                        <div style="opacity:0.5; font-size:12px;">${c.duracion}</div>
+                    </div>
+                `).join('') || '<div style="opacity:0.5;">Sin canciones.</div>';
+
+                const albumsHTML = (data.albumes || []).map(a => `
+                    <div class="am-alb-item">
+                        <img src="${a.foto || 'https://via.placeholder.com/150'}" class="am-alb-cover">
+                        <div class="am-alb-name">${a.nombre}</div>
+                        <div style="opacity:0.5; font-size:11px;">${a.anio}</div>
+                    </div>
+                `).join('') || '<div style="opacity:0.5;">Sin álbumes.</div>';
+
+                rightContent = `
+                    <div class="am-section-title">Populares</div>
+                    <div style="margin-bottom:30px;">${tracksHTML}</div>
+                    <div class="am-section-title">Discografía</div>
+                    <div class="am-grid">${albumsHTML}</div>
+                    ${data.biografia ? `<div class="am-section-title">Biografía</div><p style="font-size:13px; opacity:0.7;">${data.biografia}</p>` : ''}
+                `;
+            } else {
+                // MODO EDITAR
+                leftContent = `
+                    <div class="am-photo-frame" onclick="document.getElementById('edit-foto-file').click()">
+                        <img src="${fotoUrl}" class="am-photo" id="preview-foto">
+                        <div class="overlay-edit"><i class="fas fa-camera" style="font-size:30px; color:white;"></i></div>
+                        <input type="file" id="edit-foto-file" style="display:none" onchange="document.getElementById('preview-foto').src = window.URL.createObjectURL(this.files[0])">
+                    </div>
+                    <input type="text" id="edit-nombre" class="glass-input" value="${data.nombre}" style="font-size:20px; font-weight:bold;">
+                    <input type="text" id="edit-nacionalidad" class="glass-input" value="${data.nacionalidad}" placeholder="País">
+
+                    <div class="am-actions">
+                        <button class="btn-action-mini" onclick="cancelarEdicion()" style="background:rgba(255,255,255,0.1);"><i class="fas fa-times"></i></button>
+                        <button class="btn-action-mini" onclick="guardarEdicionInline()" style="background:#1DB954;"><i class="fas fa-check"></i></button>
+                    </div>
+                `;
+
+                // Preparamos lista de álbumes editable
+                const albumsEdit = listaAlbumsCache.map((alb, i) => `
+                    <div style="display:flex; align-items:center; background:rgba(255,255,255,0.05); padding:5px; border-radius:5px; margin-bottom:5px;">
+                        <img src="${alb.fotoUrl || alb.foto_existente || 'https://via.placeholder.com/40'}" style="width:30px; height:30px; margin-right:10px; border-radius:4px;">
+                        <div style="flex:1; font-size:12px;">${alb.titulo}</div>
+                        <button onclick="borrarAlbumCache(${i})" style="color:#ff5555; background:none; border:none; cursor:pointer;">✕</button>
+                    </div>
+                `).join('');
+
+                rightContent = `
+                    <div class="am-section-title">Canciones Populares (Texto)</div>
+                    <textarea id="edit-top-tracks" class="glass-textarea" placeholder="Canción (3:00)...">${data.texto_pop_cache || ''}</textarea>
+
+                    <div class="am-section-title" style="display:flex; justify-content:space-between;">
+                        <span>Discografía</span>
+                        <button onclick="abrirSubModalAlbum()" style="background:#8e2de2; border:none; color:white; font-size:10px; padding:4px 10px; border-radius:20px; cursor:pointer;">+ Añadir</button>
+                    </div>
+                    <div style="max-height:200px; overflow-y:auto; border:1px solid rgba(255,255,255,0.1); padding:10px; border-radius:8px; margin-bottom:20px;">
+                        ${albumsEdit || '<div style="opacity:0.5; font-size:12px;">Lista vacía.</div>'}
+                    </div>
+
+                    <div class="am-section-title">Biografía</div>
+                    <textarea id="edit-bio" class="glass-textarea" style="height:80px;">${data.biografia || ''}</textarea>
+                `;
+            }
+
+            content.innerHTML = `
+                ${glassCSS}
+                <div class="am-glass-card">
+                    <div class="am-bg-layer" style="background-image: url('${fotoUrl}');"></div>
+                    <button class="btn-glass-close" onclick="document.getElementById('modal-artista').style.display='none'">×</button>
+                    <div class="am-layout">
+                        <div class="am-col-left">${leftContent}</div>
+                        <div class="am-col-right">${rightContent}</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function abrirFormularioArtista() {
+            // Crear nuevo: abrimos el modal en modo edición con datos vacíos
+            artistaActual = {
+                id: null,
+                nombre: "",
+                nacionalidad: "",
+                biografia: "",
+                foto: "",
+                canciones: [],
+                albumes: []
+            };
+            esCreacion = true;
+            modoEdicion = true;
+            listaAlbumsCache = [];
+
+            const overlay = document.getElementById('modal-artista');
+            overlay.style.display = 'flex'; overlay.style.justifyContent = 'center'; overlay.style.alignItems = 'center';
+            renderizarInterfazArtista();
+        }
+
+        function activarEdicion() {
+            modoEdicion = true;
+            listaAlbumsCache = [];
+            albumsEliminados = [];
+            // Cargar caché de álbumes para edición
+            if (artistaActual.albumes) {
+                listaAlbumsCache = artistaActual.albumes.map(a => ({
+                    titulo: a.nombre, anio: a.anio, foto_existente: a.foto, id_existente: a.id, canciones: ""
+                }));
+            } else { listaAlbumsCache = []; }
+
+            // Cachear texto de canciones
+            let textoPop = "";
+            if(artistaActual.canciones) {
+                artistaActual.canciones.filter(c => !c.album_id).forEach(c => { textoPop += `${c.titulo} (${c.duracion})\n`; });
+            }
+            artistaActual.texto_pop_cache = textoPop;
+
+            renderizarInterfazArtista();
+        }
+
+        function cancelarEdicion() {
+            if(esCreacion) document.getElementById('modal-artista').style.display = 'none';
+            else { modoEdicion = false; renderizarInterfazArtista(); }
+        }
+
+        async function guardarEdicionInline() {
+            const btn = document.querySelector('button[onclick="guardarEdicionInline()"]');
+            if(btn) { btn.innerHTML = "⏳ Procesando..."; btn.disabled = true; }
+
+            const nombre = document.getElementById('edit-nombre').value;
+            if(!validarEntradas(nombre)) {
+                mostrarError('edit-error-msg', "Nombre obligatorio");
+                if(btn) { btn.innerHTML = "Guardar"; btn.disabled = false; }
+                return;
+            }
+            const topTracksValue = document.getElementById('edit-top-tracks').value;
+
+            // --- CAMBIO: Validación para obligar al menos una canción ---
+            if (!topTracksValue || topTracksValue.trim().length === 0) {
+                mostrarError('edit-error-msg', "Debes agregar al menos una canción popular.");
+                if(btn) { btn.innerHTML = "Guardar"; btn.disabled = false; }
+                return;
+            }
+
+            // ---------------------------------------------------------
+            // 1. FASE DE LIMPIEZA (ELIMINAR ÁLBUMES MARCADOS)
+            // ---------------------------------------------------------
+            if (albumsEliminados.length > 0) {
+                console.log("🗑️ Iniciando eliminación de:", albumsEliminados);
+
+                try {
+                    // Ejecutamos todas las eliminaciones en paralelo
+                    const resultados = await Promise.all(albumsEliminados.map(async (idAlb) => {
+                        const res = await fetch(`/albunes/${idAlb}`, { method: 'DELETE' });
+                        return { id: idAlb, ok: res.ok, status: res.status };
+                    }));
+
+                    // Verificamos si hubo fallos
+                    const fallos = resultados.filter(r => !r.ok);
+                    if (fallos.length > 0) {
+                        console.error("❌ Fallo al borrar álbumes:", fallos);
+                        alert(`Error: No se pudieron borrar ${fallos.length} álbumes. (Status: ${fallos[0].status})`);
+                        // Detenemos el guardado para que veas el error
+                        if(btn) { btn.innerHTML = "Guardar"; btn.disabled = false; }
+                        return;
+                    }
+                    console.log("✅ Todos los álbumes marcados fueron eliminados.");
+                } catch (e) {
+                    console.error("Excepción al borrar:", e);
+                    alert("Error de conexión al intentar borrar álbumes.");
+                    if(btn) { btn.innerHTML = "Guardar"; btn.disabled = false; }
+                    return;
+                }
+            }
+
+            const lineasCanciones = topTracksValue.split('\n').filter(linea => linea.trim() !== '');
+
+            // Regex para buscar (min:seg) permitiendo espacios
+            const regexTiempo = /\(\s*(\d+):(\d{2})\s*\)/;
+
+            for (let i = 0; i < lineasCanciones.length; i++) {
+                const linea = lineasCanciones[i];
+                const match = linea.match(regexTiempo);
+
+                // 1. Validar estructura general (Paréntesis y dos puntos)
+                if (!match) {
+                    mostrarError('edit-error-msg', `Formato incorrecto en línea ${i + 1}: "${linea}".\nFalta la duración, ej: (3:45).`);
+                    if(btn) { btn.innerHTML = "Guardar"; btn.disabled = false; }
+                    return;
+                }
+
+                // 2. Validar lógica de segundos (< 60)
+                const segundos = parseInt(match[2]);
+                if (segundos >= 60) {
+                    mostrarError('edit-error-msg', `Tiempo ilógico en línea ${i + 1}: "${linea}".\nLos segundos (${segundos}) no pueden ser 60 o más.`);
+                    if(btn) { btn.innerHTML = "Guardar"; btn.disabled = false; }
+                    return;
+                }
+            }
+            // ---------------------------------------------------------
+            // 2. FASE DE GUARDADO (ACTUALIZAR ARTISTA)
+            // ---------------------------------------------------------
+            const fd = new FormData();
+            fd.append('nombre', nombre);
+            fd.append('nacionalidad', document.getElementById('edit-nacionalidad').value);
+            fd.append('biografia', document.getElementById('edit-bio').value);
+            fd.append('top_canciones_texto', document.getElementById('edit-top-tracks').value);
+            fd.append('genero_principal_id', 1);
+
+            const fArt = document.getElementById('edit-foto-file').files[0];
+            if(fArt) fd.append('foto_file', fArt);
+
+            // Enviar solo álbumes NUEVOS (sin ID existente) para creación
+                const meta = listaAlbumsCache.map(alb => ({
+                    titulo: alb.titulo,
+                    anio: alb.anio,
+                    canciones_texto: alb.canciones,
+                    foto_existente: alb.fotoUrl || alb.foto_existente, // Aseguramos enviar la foto
+                    id_album: alb.id_existente || null // Importante: Si tiene ID, el backend actualiza; si es null, crea.
+                }));
+
+                fd.append('discografia_json', JSON.stringify(meta));
+
+            const url = artistaActual.id ? `/artistas/${artistaActual.id}` : '/artistas/';
+            const method = artistaActual.id ? 'PUT' : 'POST';
+
+            try {
+                const res = await fetch(url, { method: method, body: fd });
+                if(res.ok) {
+                    alert("Cambios guardados correctamente");
+                    location.reload();
+                }
+                else {
+                    const txt = await res.text();
+                    mostrarError('edit-error-msg', "Error servidor: " + txt);
+                    if(btn) { btn.innerHTML = "Guardar"; btn.disabled = false; }
+                }
+            } catch(e) {
+                console.error(e);
+                mostrarError('edit-error-msg', "Error de conexión");
+                if(btn) { btn.innerHTML = "Guardar"; btn.disabled = false; }
+            }
+        }
+
+
+        // ==========================================
+        // 5. GESTIÓN DE ÁLBUMES (GLASS DESIGN)
+        // ==========================================
+        async function verAlbum(id) {
+            trackEvent('view_album', { album_id: id });
+            const overlay = document.getElementById('modal-album');
+            const content = document.getElementById('modal-album-content');
+
+            overlay.style.display = 'flex'; overlay.style.justifyContent = 'center'; overlay.style.alignItems = 'center';
+            content.innerHTML = '<div style="color:white;">Cargando...</div>';
+
+            try {
+                const res = await fetch(`/web/api/album_data/${id}`);
+                const data = await res.json();
+                if(data.error) throw new Error(data.error);
+                albumActual = data;
+                modoEdicionAlbum = false;
+                renderizarInterfazAlbum();
+            } catch(e) {
+                overlay.style.display = 'none'; alert("Error: " + e.message);
+            }
+        }
+
+        function renderizarInterfazAlbum() {
+            const data = albumActual;
+            const content = document.getElementById('modal-album-content');
+
+            const glassCSS = `
+                <style>
+                    .alb-glass-card { display: flex; width: 900px; height: 550px; border-radius: 20px; position: relative; overflow: hidden; box-shadow: 0 50px 100px -20px rgba(0,0,0,0.9); border: 1px solid rgba(255,255,255,0.15); background: #101010; font-family: 'Poppins', sans-serif; }
+                    .alb-bg-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-size: cover; background-position: center; filter: blur(60px) brightness(0.3); transform: scale(1.2); z-index: 0; }
+                    .alb-layout { display: flex; flex-direction: row; width: 100%; height: 100%; z-index: 1; position: relative; }
+                    .alb-left { width: 320px; padding: 40px 30px; display: flex; flex-direction: column; align-items: center; background: rgba(255,255,255,0.03); border-right: 1px solid rgba(255,255,255,0.05); }
+                    .alb-cover-frame { width: 220px; height: 220px; border-radius: 10px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.5); margin-bottom: 25px; border: 1px solid rgba(255,255,255,0.1); position: relative; }
+                    .alb-cover-img { width: 100%; height: 100%; object-fit: cover; transition: 0.3s; }
+                    .alb-title { font-size: 24px; font-weight: 700; color: white; text-align: center; margin-bottom: 5px; }
+                    .alb-meta { font-size: 13px; color: rgba(255,255,255,0.6); text-transform: uppercase; letter-spacing: 1px; text-align: center; }
+                    .alb-desc { font-size: 12px; color: #ccc; margin-top: 15px; font-style: italic; text-align: center; max-height: 60px; overflow: hidden; }
+                    .alb-actions { margin-top: auto; display: flex; gap: 15px; }
+                    .alb-right { flex: 1; padding: 40px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.2) transparent; }
+                    .alb-track-row { display: flex; align-items: center; padding: 10px 15px; border-bottom: 1px solid rgba(255,255,255,0.03); color: white; transition: 0.2s; border-radius: 8px; }
+                    .alb-track-row:hover { background: rgba(255,255,255,0.08); }
+                    .glass-input { background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.2); color: white; padding: 10px; border-radius: 6px; width: 100%; margin-bottom: 10px; text-align: center; }
+                    .glass-textarea { width: 100%; height: 300px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 8px; padding: 15px; font-family: monospace; font-size: 13px; resize: none; }
+
+                      .btn-action-mini {
+                        width: 40px;
+                        height: 40px;
+                        border-radius: 50%;
+                        background: rgba(255,255,255,0.05);
+                        border: 1px solid rgba(255,255,255,0.1);
+                        color: rgba(255,255,255,0.7);
+                        cursor: pointer;
+                        transition: 0.2s;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        font-size: 14px;
+                    }
+                    .btn-action-mini:hover {
+                        background: white;
+                        color: black;
+                    }
+                    .btn-action-mini.del {
+                        background: rgba(255, 85, 85, 0.2);
+                        border-color: #ff5555;
+                    }
+                    .btn-action-mini.del:hover {
+                        background: #ff5555;
+                        color: white;
+                    }
+
+                    .btn-glass-close {
+                        position: absolute;
+                        top: 20px;
+                        right: 20px;
+                        background: rgba(255,255,255,0.1);
+                        border: none;
+                        color: rgba(255,255,255,0.8);
+                        width: 32px;
+                        height: 32px;
+                        border-radius: 50%;
+                        cursor: pointer;
+                        z-index: 100;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        font-size: 20px;
+                    }
+                    .btn-glass-close:hover {
+                        background: rgba(255,255,255,0.3);
+                        color: white;
+                    }
+
+
+                </style>
+            `;
+
+            let leftContent = '', rightContent = '';
+            const fotoUrl = data.foto || 'https://via.placeholder.com/300';
+
+            // MODO CREAR
+            if (!data.id) modoEdicionAlbum = true;
+
+            if (!modoEdicionAlbum) {
+                // VER
+                leftContent = `
+                    <div class="alb-cover-frame"><img src="${fotoUrl}" class="alb-cover-img"></div>
+                    <div class="alb-title">${data.nombre}</div>
+                    <div class="alb-meta">${data.artista_nombre || 'Artista'} • ${data.anio || ''}</div>
+                    ${data.descripcion ? `<div class="alb-desc">${data.descripcion}</div>` : ''}
+                    <div class="alb-actions">
+                        <button class="btn-action-mini" onclick="modoEdicionAlbum=true; renderizarInterfazAlbum();" title="Editar"><i class="fas fa-pen"></i></button>
+                        <button class="btn-action-mini del" onclick="eliminarItem('albunes', '${data.id}')" title="Borrar"><i class="fas fa-trash"></i></button>
+                    </div>
+                `;
+
+                const tracks = (data.canciones || []).map((c, i) => `
+                    <div class="alb-track-row">
+                        <div style="width:30px; color:rgba(255,255,255,0.4); font-weight:bold;">${i+1}</div>
+                        <div style="flex:1;">${c.titulo}</div>
+                        <div style="font-size:12px; opacity:0.5;">${c.duracion}</div>
+                    </div>
+                `).join('');
+
+                rightContent = `<h4 style="color:white; margin-bottom:15px;">Lista de Canciones</h4>${tracks || '<div style="opacity:0.5; text-align:center;">Sin canciones</div>'}`;
+            } else {
+                // EDITAR
+                let tracksText = "";
+                if(data.canciones) { data.canciones.forEach(c => { tracksText += `${c.titulo} (${c.duracion})\n`; }); }
+
+                leftContent = `
+                    <div class="alb-cover-frame" onclick="document.getElementById('edit-alb-file').click()">
+                        <img src="${fotoUrl}" class="alb-cover-img" id="preview-alb-img">
+                        <div style="position:absolute; inset:0; background:rgba(0,0,0,0.6); display:flex; align-items:center; justify-content:center; opacity:0; transition:0.2s; cursor:pointer;"><i class="fas fa-camera" style="font-size:30px; color:white;"></i></div>
+                    </div>
+                    <input type="file" id="edit-alb-file" style="display:none" onchange="document.getElementById('preview-alb-img').src = window.URL.createObjectURL(this.files[0])">
+
+                    <input type="text" id="edit-alb-nombre" class="glass-input" value="${data.nombre || ''}" placeholder="Título">
+                    <input type="number" id="edit-alb-anio" class="glass-input" value="${data.anio || ''}" placeholder="Año">
+                    <input type="number" id="edit-alb-artista-id" class="glass-input" value="${data.artista_id || ''}" placeholder="ID Artista">
+                    <input type="number" id="edit-alb-genero-id" class="glass-input" value="${data.genero_id || '1'}" placeholder="ID Género">
+                    <input type="text" id="edit-alb-desc" class="glass-input" value="${data.descripcion || ''}" placeholder="Desc / Feat">
+
+                    <div class="alb-actions">
+                        <button class="btn-action-mini" onclick="cancelarEdicionAlbum()"><i class="fas fa-times"></i></button>
+                       <button class="btn-action-mini" onclick="activarEdicionAlbum()" title="Editar"><i class="fas fa-pen"></i></button>
+                        <button class="btn-action-mini del" onclick="eliminarItem('albunes', '${data.id}')" title="Borrar"><i class="fas fa-trash"></i></button>
+                        <button class="btn-action-mini" onclick="guardarEdicionAlbum()" style="background:#1DB954;"><i class="fas fa-check"></i></button>
+                    </div>
+                `;
+
+                rightContent = `
+                    <h4 style="color:white; margin-bottom:10px;">Editar Canciones</h4>
+                    <textarea id="edit-alb-tracks" class="glass-textarea" placeholder="Ej: Cancion 1 (3:40)...">${tracksText}</textarea>
+                `;
+            }
+
+            content.innerHTML = `${glassCSS}<div class="alb-glass-card"><div class="alb-bg-layer" style="background-image: url('${fotoUrl}');"></div><button class="btn-glass-close" onclick="document.getElementById('modal-album').style.display='none'">×</button><div class="alb-layout"><div class="alb-left">${leftContent}</div><div class="alb-right">${rightContent}</div></div></div>`;
+        }
+
+        function cancelarEdicionAlbum() {
+            if (!albumActual.id) document.getElementById('modal-album').style.display='none';
+            else { modoEdicionAlbum = false; renderizarInterfazAlbum(); }
+        }
+
+                // ... (Pega esto al inicio de tu archivo, junto a las otras utilidades)
+        async function guardarEdicionAlbum() {
+            const btn = document.querySelector('.alb-actions-center button:last-child') ||
+                        document.querySelector('.alb-actions button:last-child');
+            const textoOriginal = btn ? btn.innerHTML : 'Guardar';
+            const currentYear = new Date().getFullYear();
+
+            // 1. Captura de Datos
+            const nombre = document.getElementById('edit-alb-nombre').value;
+            const anio = document.getElementById('edit-alb-anio').value;
+            const tracks = document.getElementById('edit-alb-tracks').value;
+            const artistaId = document.getElementById('edit-alb-artista-id').value;
+            const generoId = document.getElementById('edit-alb-genero-id').value || 1;
+            const descripcion = document.getElementById('edit-alb-desc').value;
+
+            // 2. Validaciones Básicas
+            if(!nombre || !nombre.trim()) { mostrarError('alb-glass-error', "Falta el Título."); return; }
+            if(!anio || isNaN(anio) || anio < 1900 || anio > currentYear) { mostrarError('alb-glass-error', `Año inválido.`); return; }
+            if(!artistaId) { mostrarError('alb-glass-error', "Falta ID del Artista."); return; }
+
+            // --- CAMBIO: VALIDAR QUE EL ARTISTA EXISTA ANTES DE GUARDAR ---
+            if(btn) { btn.innerHTML = '🔍 Verificando...'; btn.disabled = true; }
+
+            try {
+                const checkArt = await fetch(`/web/api/artist_data/${artistaId}`);
+                const dataArt = await checkArt.json();
+                if(dataArt.error) {
+                    mostrarError('alb-glass-error', `❌ El Artista ID ${artistaId} no existe.`);
+                    if(btn) { btn.innerHTML = textoOriginal; btn.disabled = false; }
+                    return; // Detenemos aquí
+                }
+            } catch(e) {
+                console.warn("No se pudo verificar artista, continuando...");
+            }
+            // ---------------------------------------------------------------
+
+            const lineasCanciones = tracks.split('\n').filter(linea => linea.trim() !== '');
+            if(lineasCanciones.length === 0) {
+                mostrarError('alb-glass-error', "El álbum no puede estar vacío.");
+                if(btn) { btn.innerHTML = textoOriginal; btn.disabled = false; }
+                return;
+            }
+
+            // 3. Validación Cantidad vs Descripción
+            const matchCantidad = descripcion.match(/(\d+)\s*(?:cancion|pista)/i);
+            if (matchCantidad) {
+                const cantidadEsperada = parseInt(matchCantidad[1]);
+                if (cantidadEsperada > 0 && lineasCanciones.length !== cantidadEsperada) {
+                    mostrarError('alb-glass-error', `Error: Descripción dice ${cantidadEsperada} canciones, pero hay ${lineasCanciones.length}.`);
+                    if(btn) { btn.innerHTML = textoOriginal; btn.disabled = false; }
+                    return;
+                }
+            }
+
+            // 4. Validación Formato
+            const regexTiempo = /\(\s*(\d+):(\d{2})\s*\)/;
+            for (let i = 0; i < lineasCanciones.length; i++) {
+                const linea = lineasCanciones[i];
+                const match = linea.match(regexTiempo);
+                if (!match) {
+                    mostrarError('alb-glass-error', `Error línea ${i+1}: Falta duración (min:seg).`);
+                    if(btn) { btn.innerHTML = textoOriginal; btn.disabled = false; }
+                    return;
+                }
+                if (parseInt(match[2]) >= 60) {
+                    mostrarError('alb-glass-error', `Error línea ${i+1}: Segundos inválidos.`);
+                    if(btn) { btn.innerHTML = textoOriginal; btn.disabled = false; }
+                    return;
+                }
+            }
+
+            // 5. Enviar Datos
+            const fd = new FormData();
+            fd.append('nombre', nombre);
+            fd.append('anio_lanzamiento', anio);
+            fd.append('canciones_texto', tracks);
+            fd.append('artista_principal_id', artistaId);
+            fd.append('genero_id', generoId);
+            fd.append('descripcion', descripcion);
+
+            const fileInput = document.getElementById('edit-alb-file');
+            if(fileInput && fileInput.files[0]) fd.append('foto_file', fileInput.files[0]);
+
+            const url = albumActual.id ? `/albunes/${albumActual.id}` : '/albunes/';
+            const method = albumActual.id ? 'PUT' : 'POST';
+
+            if(btn) btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
+
+            try {
+                const res = await fetch(url, { method: method, body: fd });
+                if(res.ok) {
+                    mostrarExito(albumActual.id ? "Álbum Actualizado" : "Álbum Creado");
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    const txt = await res.text();
+                    try {
+                        const json = JSON.parse(txt);
+                        // Ahora mostramos el mensaje limpio del backend (ej: "El Artista ID 90 no existe")
+                        mostrarError('alb-glass-error', json.detail || txt);
+                    }
+                    catch { mostrarError('alb-glass-error', "Error: " + txt); }
+                }
+            } catch(e) {
+                mostrarError('alb-glass-error', "Error conexión");
+            } finally {
+                if(btn) { btn.innerHTML = textoOriginal; btn.disabled = false; }
+            }
+        }
+// ... (resto de tu código)
+
+        function abrirFormularioAlbum(id) {
+            // Inicializamos un objeto vacío para "Crear"
+            albumActual = {
+                id: null, // Null = Crear nuevo
+                nombre: "",
+                anio: "",
+                artista_id: "",
+                descripcion: "",
+                foto: "",
+                canciones: [],
+                genero_id: ""
+            };
+
+            const overlay = document.getElementById('modal-album');
+            const content = document.getElementById('modal-album-content');
+
+            // Reseteamos estilos para asegurar limpieza
+            overlay.style.display = 'flex';
+            overlay.style.justifyContent = 'center';
+            overlay.style.alignItems = 'center';
+
+            // Forzamos modo edición
+            modoEdicionAlbum = true;
+
+            // Renderizamos la interfaz Glass (que ahora soporta modo creación)
+            renderizarInterfazAlbum();
+        }
+
+
+        // ==========================================
+        // 6. GESTIÓN DE GÉNEROS (DISEÑO GLASS LADO A LADO)
+        // ==========================================
+        async function verInfoGenero(id) {
+            const overlay = document.getElementById('modal-info-genero');
+            const content = document.getElementById('modal-info-genero-content');
+
+            if (!overlay || !content) { alert("Falta modal-info-genero en HTML"); return; }
+
+            overlay.style.display = 'flex'; overlay.style.justifyContent = 'center'; overlay.style.alignItems = 'center';
+            content.innerHTML = '<div style="color:white;">Cargando...</div>';
+
+            try {
+                const res = await fetch(`/generos/${id}/detalle`);
+                if (!res.ok) throw new Error("Error");
+                const data = await res.json();
+                generoActual = data;
+                modoEdicionGenero = false;
+                renderizarInterfazGenero();
+            } catch(e) { overlay.style.display = 'none'; alert("Error: " + e.message); }
+        }
+
+        function renderizarInterfazGenero() {
+            const data = generoActual;
+            const content = document.getElementById('modal-info-genero-content');
+
+            const genreCSS = `
+                <style>
+                    .gen-glass-card { display: flex; width: 850px; height: 500px; border-radius: 20px; position: relative; overflow: hidden; box-shadow: 0 50px 100px -20px rgba(0,0,0,0.9); border: 1px solid rgba(255,255,255,0.15); background: #101010; font-family: 'Poppins', sans-serif; }
+                    .gen-bg-layer { position: absolute; inset: 0; z-index: 0; background: linear-gradient(135deg, #4a00e0, #8e2de2); opacity: 0.3; filter: blur(50px); }
+                    .gen-layout { display: flex; width: 100%; height: 100%; z-index: 1; position: relative; }
+                    .gen-left { width: 300px; padding: 40px 30px; display: flex; flex-direction: column; align-items: center; background: rgba(255,255,255,0.03); border-right: 1px solid rgba(255,255,255,0.05); }
+                    .gen-cover-frame { width: 200px; height: 200px; border-radius: 20px; overflow: hidden; margin-bottom: 25px; box-shadow: 0 20px 40px rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); position: relative; background: #222; }
+                    .gen-cover-img { width: 100%; height: 100%; object-fit: cover; }
+                    .gen-title { font-size: 32px; font-weight: 800; color: white; margin-bottom: 15px; text-align: center; }
+                    .gen-desc { font-size: 13px; color: rgba(255,255,255,0.7); text-align: center; max-height: 100px; overflow-y: auto; }
+                    .gen-right { flex: 1; padding: 40px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.2) transparent; }
+                    /* BOTONES CIRCULARES */
+                    .btn-action-mini {
+                        width: 40px;
+                        height: 40px;
+                        border-radius: 50%;
+                        background: rgba(255,255,255,0.05);
+                        border: 1px solid rgba(255,255,255,0.1);
+                        color: rgba(255,255,255,0.7);
+                        cursor: pointer;
+                        transition: 0.2s;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        font-size: 14px;
+                    }
+                    .btn-action-mini:hover {
+                        background: white;
+                        color: black;
+                    }
+                    .btn-action-mini.del {
+                        background: rgba(255, 85, 85, 0.2);
+                        border-color: #ff5555;
+                    }
+                    .btn-action-mini.del:hover {
+                        background: #ff5555;
+                        color: white;
+                    }
+                    .gen-actions {
+                        margin-top: auto;
+                        display: flex;
+                        gap: 15px;
+                        z-index: 10;
+                    }
+                    .btn-glass-close {
+                    position: absolute;
+                    top: 20px;
+                    right: 20px;
+                    background: rgba(255,255,255,0.1);
+                    border: none;
+                    color: rgba(255,255,255,0.8);
+                    width: 32px;
+                    height: 32px;
+                    border-radius: 50%;
+                    cursor: pointer;
+                    z-index: 100;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 20px;
+                }
+                .btn-glass-close:hover {
+                    background: rgba(255,255,255,0.3);
+                    color: white;
+                }
+
+
+                </style>
+            `;
+
+            let leftHTML = '', rightHTML = '';
+            const fotoUrl = data.foto || 'https://via.placeholder.com/300/333/fff?text=Genero';
+
+            // Listas
+            const albumsList = (data.albumes || []).map(a => `<div class="gen-list-item" style="padding:8px; border-bottom:1px solid rgba(255,255,255,0.05); margin-bottom:5px;">${a.nombre}</div>`).join('') || '<div style="opacity:0.5;">Ninguno</div>';
+            const songsList = (data.canciones || []).map(c => `<div class="gen-list-item" style="padding:8px; border-bottom:1px solid rgba(255,255,255,0.05); margin-bottom:5px;">${c.titulo}</div>`).join('') || '<div style="opacity:0.5;">Ninguna</div>';
+
+            if (!modoEdicionGenero) {
+                leftHTML = `
+                    <div class="gen-cover-frame"><img src="${fotoUrl}" class="gen-cover-img"></div>
+                    <div class="gen-title">${data.nombre}</div>
+                    <div class="gen-desc">${data.descripcion || 'Sin descripción.'}</div>
+                    <div class="gen-actions" style="margin-top:auto; display:flex; gap:10px;">
+                        <button class="btn-action-mini" onclick="modoEdicionGenero=true; renderizarInterfazGenero()"><i class="fas fa-pen"></i></button>
+                        <button class="btn-action-mini del" onclick="eliminarGenero('${data.id}')"><i class="fas fa-trash"></i></button>
+                    </div>
+                `;
+                rightHTML = `
+                    <h4 style="color:white;">Álbumes</h4><div style="margin-bottom:20px;">${albumsList}</div>
+                    <h4 style="color:white;">Canciones</h4><div>${songsList}</div>
+                `;
+            } else {
+                leftHTML = `
+                    <div class="gen-cover-frame" onclick="document.getElementById('edit-gen-file').click()">
+                        <img src="${fotoUrl}" class="gen-cover-img" id="preview-gen-img">
+                        <div class="overlay-edit" style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,0.5); cursor:pointer;"><i class="fas fa-camera" style="font-size:30px; color:white;"></i></div>
+                    </div>
+                    <input type="file" id="edit-gen-file" style="display:none" onchange="document.getElementById('preview-gen-img').src = window.URL.createObjectURL(this.files[0])">
+                    <input type="text" id="edit-gen-nombre" class="glass-input" value="${data.nombre}" placeholder="Nombre">
+                    <textarea id="edit-gen-desc" class="glass-textarea" style="height:100px;">${data.descripcion || ''}</textarea>
+                    <div class="gen-actions" style="margin-top:auto; display:flex; gap:10px;">
+                        <button class="btn-action-mini" onclick="modoEdicionGenero=false; renderizarInterfazGenero()"><i class="fas fa-times"></i></button>
+                        <button class="btn-action-mini" onclick="guardarEdicionGenero()" style="background:#1DB954;"><i class="fas fa-check"></i></button>
+                    </div>
+                `;
+                rightHTML = `
+                    <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; opacity:0.5; text-align:center;">
+                        <i class="fas fa-info-circle" style="font-size:40px; margin-bottom:20px;"></i>
+                        <p>Para agregar contenido a este género,<br>edita los álbumes/canciones y asigna el ID: <b>${data.id}</b></p>
+                    </div>
+                `;
+            }
+
+            content.innerHTML = `${genreCSS}<div class="gen-glass-card"><div class="gen-bg-layer"></div><button class="btn-glass-close" onclick="document.getElementById('modal-info-genero').style.display='none'">×</button><div class="gen-layout"><div class="gen-left">${leftHTML}</div><div class="gen-right">${rightHTML}</div></div></div>`;
+        }
+
+        async function guardarEdicionGenero() {
+            const nombre = document.getElementById('edit-gen-nombre').value;
+            const desc = document.getElementById('edit-gen-desc').value;
+            if(!nombre) return alert("Nombre obligatorio");
+            const fd = new FormData();
+            fd.append('nombre', nombre);
+            fd.append('descripcion', desc);
+            const file = document.getElementById('edit-gen-file').files[0];
+            if(file) fd.append('foto_file', file);
+
+            try {
+                const res = await fetch(`/generos/${generoActual.id}`, { method: 'PUT', body: fd });
+                if(res.ok) { alert("Actualizado"); location.reload(); }
+                else alert("Error al actualizar");
+            } catch(e) { console.error(e); }
+        }
+
+        async function eliminarGenero(id) {
+            if(confirm("¿Eliminar género?")) {
+                await fetch(`/generos/${id}`, { method: 'DELETE' });
+                location.reload();
+            }
+        }
+
+        // ... (Otras funciones auxiliares: eliminarItem, importar, etc.)
+        async function eliminarItem(tipo, id) { if(confirm(`¿Eliminar ${tipo}?`)) { await fetch(`/${tipo}/${id}`, { method: 'DELETE' }); location.reload(); } }
+        async function guardarCancion() { alert("Guardar Canción"); }
+        function abrirSubModalAlbum() {
+            // Limpiar campos
+            document.getElementById('sub-alb-titulo').value = "";
+            document.getElementById('sub-alb-anio').value = "";
+            document.getElementById('sub-alb-canciones').value = "";
+            document.getElementById('sub-alb-file').value = "";
+            // Mostrar modal
+            document.getElementById('modal-sub-album').style.display = 'flex';
+        }
+
+        function confirmarAlbum() {
+            const tit = document.getElementById('sub-alb-titulo').value;
+            const anio = document.getElementById('sub-alb-anio').value;
+            const tracks = document.getElementById('sub-alb-canciones').value;
+            const file = document.getElementById('sub-alb-file').files[0];
+
+            if(!validarEntradas(tit)) return alert("Falta título");
+            if(!validarEntradas(anio, 'anio')) return alert("Año inválido");
+
+            // Agregar a la lista temporal
+            listaAlbumsCache.push({
+                titulo: tit,
+                anio: anio,
+                canciones: tracks,
+                archivo: file,
+                fotoUrl: file ? URL.createObjectURL(file) : null,
+                id_existente: null // Es nuevo
+            });
+
+            document.getElementById('modal-sub-album').style.display = 'none';
+            renderizarInterfazArtista();
+        }
+
+        function borrarAlbumCache(index) {
+            const album = listaAlbumsCache[index];
+            // Si el álbum ya existe en la BD (tiene ID), lo marcamos para morir
+            if (album && album.id_existente) {
+                albumsEliminados.push(album.id_existente);
+                console.log("💀 Álbum marcado para eliminar:", album.titulo, "(ID:", album.id_existente, ")");
+            }
+            // Lo quitamos de la lista visual
+            listaAlbumsCache.splice(index, 1);
+            renderizarInterfazArtista();
+        }
+
+
+
+
+    </script>
+</body>
+</html>

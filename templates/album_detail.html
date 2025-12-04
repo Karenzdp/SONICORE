@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ album.nombre }} - SONICORE</title>
+    <link href="{{ url_for('static', path='/styles.css') }}" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .album-header { display: flex; align-items: flex-end; gap: 30px; padding: 40px; background: linear-gradient(to bottom, #4a4a4a, #121212); }
+        .album-cover-large { width: 230px; height: 230px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); object-fit: cover; border-radius: 8px; }
+        .album-info h1 { font-size: 50px; font-weight: 900; margin: 0; color: white; line-height: 1.1; }
+        .album-meta { color: #ccc; font-size: 14px; margin-top: 10px; font-weight: bold; }
+        .track-table { padding: 20px 40px; }
+        /* Reutilizamos estilos de styles.css */
+    </style>
+</head>
+<body>
+    <div class="main-content" style="background: #121212; min-height:100vh; padding-bottom:100px;">
+        <nav class="navbar" style="background: transparent;">
+            <a href="/web/?filtro=albunes" style="color:white; font-size:18px; text-decoration:none; display:flex; align-items:center; gap:10px;">
+                <i class="fas fa-arrow-left"></i> Volver a Álbumes
+            </a>
+        </nav>
+
+        <div class="album-header">
+            <img src="{{ album.foto_portada or 'https://via.placeholder.com/300' }}" class="album-cover-large">
+            <div class="album-info">
+                <span style="font-size:12px; font-weight:bold;">ÁLBUM</span>
+                <h1>{{ album.nombre }}</h1>
+                <div class="album-meta">
+                    {{ album.anio_lanzamiento }} • {{ canciones|length }} canciones
+                </div>
+                <p style="color:#888; font-size:12px; margin-top:10px;">{{ album.descripcion }}</p>
+            </div>
+        </div>
+
+        <div class="track-table">
+            <div style="border-bottom:1px solid #333; padding-bottom:10px; margin-bottom:10px; font-size:12px; text-transform:uppercase; display:flex; color:#aaa;">
+                <div style="width:40px">#</div>
+                <div style="flex:1">Título</div>
+                <div style="width:100px; text-align:right;">Duración</div>
+            </div>
+
+            {% for c in canciones %}
+            {% set is_liked = c.id_cancion in mis_likes %}
+            <div class="track-row">
+                <div style="width:40px; text-align:center; color:var(--c-gold);">{{ loop.index }}</div>
+                <div class="track-info">
+                    <span class="track-title">{{ c.titulo }}</span>
+                </div>
+                <div style="display:flex; gap:15px; margin-right:20px; align-items:center;">
+                    <i class="fas fa-play-circle" style="cursor:pointer; font-size:20px; color:var(--c-spotify);" onclick="control('play?uri={{ c.titulo }}')"></i>
+                    <i class="fas fa-chart-pie" style="cursor:pointer; font-size:18px; color:var(--c-salmon);" onclick="abrirAnalisis('{{ c.titulo }}', '{{ c.id_cancion }}', '{{ c.duracion }}')"></i>
+                    <i class="{{ 'fas' if is_liked else 'far' }} fa-heart" style="cursor:pointer; font-size:18px; color:{{ 'var(--c-salmon)' if is_liked else 'gray' }};" onclick="toggleLikeLocal(this, {{ c.id_cancion }})"></i>
+                </div>
+                <div style="width:60px; text-align:right; font-size:13px;">{{ c.duracion }}</div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    {% include 'dashboard_scripts.html' ignore missing %}
+
+    <script>
+        // Script mínimo para que funcione play y like si no usas include
+        async function control(action) { try { await fetch(`/player/${action}`, {method:'POST'}); } catch(e){} }
+        async function toggleLikeLocal(btn, id) {
+             try {
+                const res = await fetch(`/web/like/${id}`, { method: 'POST' });
+                const data = await res.json();
+                if(data.es_favorito) { btn.classList.remove('far'); btn.classList.add('fas'); btn.style.color = 'var(--c-salmon)'; }
+                else { btn.classList.remove('fas'); btn.classList.add('far'); btn.style.color = 'gray'; }
+            } catch(e){}
+        }
+    </script>
+</body>
+</html>
