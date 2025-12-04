@@ -433,3 +433,50 @@ def importar_desde_spotify(
     except Exception as e:
         session.rollback()
         return {"error": str(e)}
+    
+@router.get("/api/artist_data/{id_artista}")
+def get_artist_data(id_artista: int, session: Session = Depends(get_session)):
+    """API para obtener datos completos de un artista para el Modal Glass"""
+    repo = ArtistaRepository(session)
+    artista = repo.get_by_id(id_artista)
+    if not artista:
+        return {"error": "Artista no encontrado"}
+    
+    # Estructura de respuesta enriquecida
+    resp = {
+        "id": artista.id_artista, 
+        "nombre": artista.nombre, 
+        "nacionalidad": artista.nacionalidad,
+        "biografia": artista.biografia, 
+        "foto": artista.foto, 
+        "albumes": [], 
+        "canciones": []
+    }
+    
+    try:
+        # Cargar Álbumes
+        from app.models.albumes import Album
+        albs = session.exec(select(Album).where(Album.artista_principal_id == id_artista)).all()
+        for a in albs: 
+            resp["albumes"].append({
+                "id": a.id_album, 
+                "nombre": a.nombre, 
+                "anio": a.anio_lanzamiento, 
+                "foto": a.foto_portada
+            })
+            
+        # Cargar Canciones Top (Las que no pertenecen a un álbum específico o todas)
+        # Nota: Aquí mostramos todas las del artista limitadas a 10 para el perfil
+        from app.models.canciones import Cancion
+        cans = session.exec(select(Cancion).where(Cancion.artista_id == id_artista).limit(10)).all()
+        for c in cans: 
+            resp["canciones"].append({
+                "id": c.id_cancion, 
+                "titulo": c.titulo, 
+                "duracion": c.duracion, 
+                "album_id": c.album_id
+            })
+    except Exception as e:
+        print(f"⚠️ Error cargando relaciones artista: {e}")
+
+    return resp

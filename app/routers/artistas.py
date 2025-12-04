@@ -82,14 +82,14 @@ def obtener_todos(session: Session = Depends(get_session)):
     return repo.get_all()
 
 
-# --- 3. OBTENER UNO (GET ID) - ¡ESTA FALTABA! ---
+"""
 @router.get("/{id_artista}", response_model=ArtistaRead)
 def obtener_uno(id_artista: int, session: Session = Depends(get_session)):
     repo = ArtistaRepository(session)
     artista = repo.get_by_id(id_artista)
     if not artista:
         raise HTTPException(status_code=404, detail="Artista no encontrado")
-    return artista
+    return artista"""
 
 
 # --- 4. ACTUALIZAR (PUT) - ¡ESTA FALTABA! ---
