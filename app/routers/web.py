@@ -3,8 +3,6 @@ from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlmodel import Session, select
 from typing import Optional
-
-# --- DEPENDENCIAS Y SERVICIOS ---
 from app.dependencies import get_session
 from app.services.music_service import MusicService
 from app.services.analytics_service import AnalyticsService
@@ -27,9 +25,6 @@ router = APIRouter(prefix="/web", tags=["Web Interface"])
 templates = Jinja2Templates(directory="templates")
 
 
-# ==============================================================================
-# RUTA PRINCIPAL (DASHBOARD)
-# ==============================================================================
 @router.get("/")
 async def dashboard(
         request: Request,
@@ -324,9 +319,8 @@ def get_album_data(id_album: int, session: Session = Depends(get_session)):
     artista = repo_art.get_by_id(album.artista_principal_id)
     artista_nombre = artista.nombre if artista else "Desconocido"
 
-    # Obtener canciones
     canciones = session.exec(select(Cancion).where(Cancion.album_id == id_album)).all()
-
+   
     return {
         "id": album.id_album,
         "nombre": album.nombre,
@@ -335,5 +329,6 @@ def get_album_data(id_album: int, session: Session = Depends(get_session)):
         "descripcion": album.descripcion,
         "artista_id": album.artista_principal_id,
         "artista_nombre": artista_nombre,
+        "genero_id": album.genero_id,
         "canciones": [{"id": c.id_cancion, "titulo": c.titulo, "duracion": c.duracion} for c in canciones]
     }
