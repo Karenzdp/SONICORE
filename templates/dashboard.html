@@ -283,19 +283,22 @@
                     </h3>
                     <div class="track-list">
                         {% for cancion in canciones %}
-                        {% set is_liked = cancion.id_cancion in mis_likes %}
-                        {% set id_final = cancion.id_cancion if cancion.id_cancion else cancion.id %}
-                        <div class="track-row">
-                            <div class="track-img" onclick="control('play?uri={{ cancion.titulo }}')"><i class="fas fa-play"></i></div>
-                            <div class="track-info">
-                                <div class="t-name">{{ cancion.titulo }}</div>
-                                <div class="t-artist">ID: {{ id_final }}</div>
+                            <div class="track-row">
+                                <div class="track-img" onclick="control('play?uri={{ cancion.titulo }}')">
+                                    <i class="fas fa-play"></i>
+                                </div>
+                                <div class="track-info">
+                                    <!-- ⚠️ SIN COMILLAS en el número -->
+                                    <div class="t-name" style="cursor:pointer;" onclick="verCancion({{ cancion.id_cancion }})">
+                                        {{ cancion.titulo }}
+                                    </div>
+                                    <div class="t-artist">{{ cancion.duracion }}</div>
+                                </div>
+                                <div class="track-meta">
+                                    <span>{{ cancion.duracion }}</span>
+                                    <i class="fas fa-heart" onclick="toggleLikeLocal(this, {{ cancion.id_cancion }})"></i>
+                                </div>
                             </div>
-                            <div class="track-meta">
-                                <span>{{ cancion.duracion }}</span>
-                                <i class="{{ 'fas' if is_liked else 'far' }} fa-heart" style="color:{{ 'var(--c-pink)' if is_liked else 'gray' }}; cursor:pointer;" onclick="toggleLikeLocal(this,{{ id_final }})"></i>
-                            </div>
-                        </div>
                         {% endfor %}
                     </div>
                 </div>
@@ -1499,7 +1502,332 @@
             renderizarInterfazArtista();
         }
 
+                // ============================================================================
+        // GESTIÓN DE CANCIONES - VERSIÓN CORREGIDA
+        // ============================================================================
 
+        // Variables globales
+        let cancionActual = {};
+        let modoEdicionCancion = false;
+
+        /**
+         * 🎵 VER CANCIÓN (MODO LECTURA)
+         */
+        async function verCancion(id) {
+            console.log('🎵 Abriendo canción ID:', id);
+
+            if (typeof trackEvent === 'function') {
+                trackEvent('view_song', { song_id: id });
+            }
+
+            const overlay = document.getElementById('modal-cancion-form');
+            if (!overlay) {
+                console.error("❌ No existe el modal 'modal-cancion-form' en el HTML");
+                return alert("Error: Falta el modal de canción");
+            }
+
+            overlay.style.display = 'flex';
+            overlay.style.justifyContent = 'center';
+            overlay.style.alignItems = 'center';
+            overlay.innerHTML = '<div style="color:white; font-size:20px;"><i class="fas fa-spinner fa-spin"></i> Cargando...</div>';
+
+            try {
+                const res = await fetch(`/web/api/song_data/${id}`);
+                const data = await res.json();
+
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+
+                cancionActual = data;
+                modoEdicionCancion = false;
+                renderizarInterfazCancion();
+
+                console.log('✅ Canción cargada:', data.titulo);
+            } catch (e) {
+                overlay.style.display = 'none';
+                alert("❌ Error al cargar la canción: " + e.message);
+                console.error('🔥 Error completo:', e);
+            }
+        }
+
+        /**
+         * ➕ ABRIR FORMULARIO PARA CREAR NUEVA CANCIÓN
+         */
+        function abrirFormularioCancion() {
+            console.log('➕ Abriendo formulario nueva canción');
+
+            cancionActual = {
+                id: null,
+                titulo: "",
+                duracion: "",
+                artista_id: "",
+                album_id: "",
+                genero_id: "1",
+                anio: ""
+            };
+
+            const overlay = document.getElementById('modal-cancion-form');
+            if (!overlay) {
+                console.error("❌ No existe el modal 'modal-cancion-form'");
+                return;
+            }
+
+            overlay.style.display = 'flex';
+            overlay.style.justifyContent = 'center';
+            overlay.style.alignItems = 'center';
+            modoEdicionCancion = true;
+            renderizarInterfazCancion();
+        }
+
+        /**
+         * 🎨 RENDERIZAR INTERFAZ DEL MODAL
+         */
+        function renderizarInterfazCancion() {
+            const data = cancionActual;
+            const overlay = document.getElementById('modal-cancion-form');
+            const fotoUrl = data.foto || 'https://via.placeholder.com/300/1a1a1a/ffffff?text=♪';
+
+            const songGlassCSS = `
+                <style>
+                    .can-glass-card { display: flex; width: 700px; height: 450px; border-radius: 20px; position: relative; overflow: hidden; box-shadow: 0 50px 100px -20px rgba(0,0,0,0.9); border: 1px solid rgba(255,255,255,0.15); background: #101010; font-family: 'Poppins', sans-serif; }
+                    .can-bg-layer { position: absolute; inset: 0; z-index: 0; background-size: cover; background-position: center; filter: blur(50px) brightness(0.4); transform: scale(1.2); }
+                    .can-layout { position: relative; z-index: 1; display: flex; width: 100%; height: 100%; }
+                    .can-left { width: 280px; padding: 30px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(255,255,255,0.03); border-right: 1px solid rgba(255,255,255,0.05); }
+                    .can-cover { width: 180px; height: 180px; border-radius: 15px; box-shadow: 0 20px 50px rgba(0,0,0,0.6); object-fit: cover; margin-bottom: 20px; }
+                    .can-right { flex: 1; padding: 30px; display: flex; flex-direction: column; justify-content: center; overflow-y: auto; }
+                    .can-title-big { font-size: 28px; font-weight: 700; color: white; line-height: 1.1; margin-bottom: 20px; }
+                    .can-grid-info { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; width: 100%; }
+                    .can-field { border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px; }
+                    .can-lbl { font-size: 11px; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 1px; }
+                    .can-val { font-size: 14px; color: white; font-weight: 500; }
+                    .glass-input-can { background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.2); color: white; padding: 12px; border-radius: 8px; width: 100%; font-size: 14px; margin-bottom: 10px; }
+                    .can-actions { display: flex; gap: 10px; margin-top: 20px; }
+                    .btn-can-mini { width: 45px; height: 45px; border-radius: 50%; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.1); color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
+                    .btn-can-mini:hover { background: white; color: black; transform: translateY(-3px); }
+                    .btn-can-mini.save { background: #1DB954; border-color: #1DB954; }
+                    .btn-can-mini.del { background: #ff5555; border-color: #ff5555; }
+                    .btn-can-close { position: absolute; top: 15px; right: 15px; background: rgba(255,255,255,0.1); border: none; color: white; width: 32px; height: 32px; border-radius: 50%; font-size: 18px; cursor: pointer; z-index: 100; display: flex; align-items: center; justify-content: center; }
+                    .btn-can-close:hover { background: white; color: black; }
+                </style>
+            `;
+
+            let contentHTML = '';
+
+            if (!modoEdicionCancion) {
+                // 📖 MODO LECTURA
+                contentHTML = `
+                    <div class="can-left">
+                        <img src="${fotoUrl}" class="can-cover">
+                        <div class="can-actions">
+                            <button class="btn-can-mini" onclick="modoEdicionCancion=true; renderizarInterfazCancion()" title="Editar">
+                                <i class="fas fa-pen"></i>
+                            </button>
+                            <button class="btn-can-mini del" onclick="eliminarCancion(${data.id})" title="Eliminar">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                            <button class="btn-can-mini" onclick="control('play?uri=${data.titulo}')" title="Reproducir">
+                                <i class="fas fa-play"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="can-right">
+                        <div class="can-title-big">${data.titulo}</div>
+                        <div class="can-grid-info">
+                            <div class="can-field">
+                                <div class="can-lbl">Artista</div>
+                                <div class="can-val">${data.artista_nombre || 'Desconocido'}</div>
+                            </div>
+                            <div class="can-field">
+                                <div class="can-lbl">Duración</div>
+                                <div class="can-val">${data.duracion || 'N/A'}</div>
+                            </div>
+                            <div class="can-field">
+                                <div class="can-lbl">Álbum</div>
+                                <div class="can-val">${data.album_nombre || 'Sencillo'}</div>
+                            </div>
+                            <div class="can-field">
+                                <div class="can-lbl">Género</div>
+                                <div class="can-val">${data.genero_nombre || 'General'}</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } else {
+                // ✏️ MODO EDICIÓN/CREACIÓN
+                contentHTML = `
+                    <div class="can-left">
+                        <img src="${fotoUrl}" class="can-cover" style="opacity:0.6">
+                        <div class="can-actions">
+                            <button class="btn-can-mini" onclick="cerrarModalCancion()">
+                                <i class="fas fa-times"></i>
+                            </button>
+                            <button class="btn-can-mini save" onclick="guardarCancion()">
+                                <i class="fas fa-check"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="can-right">
+                        <h4 style="color:white; margin-bottom:15px;">${data.id ? '✏️ Editar Canción' : '➕ Nueva Canción'}</h4>
+
+                        <input type="text" id="form-can-titulo" class="glass-input-can" placeholder="Título *" value="${data.titulo || ''}">
+
+                        <div style="display:flex; gap:10px;">
+                            <input type="text" id="form-can-duracion" class="glass-input-can" placeholder="Duración (3:45) *" value="${data.duracion || ''}" style="flex:1;">
+                            <input type="number" id="form-can-anio-lanzamiento" class="glass-input-can" placeholder="Año" value="${data.anio || ''}" style="width:100px;">
+                        </div>
+
+                        <div style="display:flex; gap:10px;">
+                            <input type="number" id="form-can-artista" class="glass-input-can" placeholder="ID Artista *" value="${data.artista_id || ''}">
+                            <input type="number" id="form-can-album" class="glass-input-can" placeholder="ID Álbum" value="${data.album_id || ''}">
+                        </div>
+
+                        <input type="number" id="form-can-genero" class="glass-input-can" placeholder="ID Género" value="${data.genero_id || 1}">
+
+                        <div id="can-error-msg" class="error-toast"></div>
+                    </div>
+                `;
+            }
+
+            overlay.innerHTML = `
+                ${songGlassCSS}
+                <div class="can-glass-card">
+                    <div class="can-bg-layer" style="background-image: url('${fotoUrl}');"></div>
+                    <button class="btn-can-close" onclick="cerrarModalCancion()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                    <div class="can-layout">${contentHTML}</div>
+                </div>
+            `;
+        }
+
+        /**
+         * 💾 GUARDAR CANCIÓN (CREAR O ACTUALIZAR)
+         */
+        async function guardarCancion() {
+            console.log('💾 Guardando canción...');
+
+            const btn = document.querySelector('.btn-can-mini.save');
+            const originalText = btn ? btn.innerHTML : '';
+
+            // Capturar valores
+            const titulo = document.getElementById('form-can-titulo')?.value;
+            const duracion = document.getElementById('form-can-duracion')?.value;
+            const artistaId = document.getElementById('form-can-artista')?.value;
+            const albumId = document.getElementById('form-can-album')?.value;
+            const generoId = document.getElementById('form-can-genero')?.value;
+            const anioLanzamiento = document.getElementById('form-can-anio-lanzamiento')?.value;
+
+            // Validaciones Frontend
+            if (!titulo?.trim()) {
+                return mostrarError('can-error-msg', "⚠️ El título es obligatorio");
+            }
+
+            if (!artistaId) {
+                return mostrarError('can-error-msg', "⚠️ Debes especificar un Artista");
+            }
+
+            const match = duracion?.match(/^(\d+):(\d{2})$/);
+            if (!match) {
+                return mostrarError('can-error-msg', "⚠️ Formato de duración inválido (ej: 3:45)");
+            }
+
+            if (parseInt(match[2]) >= 60) {
+                return mostrarError('can-error-msg', "⚠️ Los segundos deben ser menores a 60");
+            }
+
+            // Preparar datos
+            const fd = new FormData();
+            fd.append('titulo', titulo.trim());
+            fd.append('duracion', duracion);
+            fd.append('artista_id', artistaId);
+            fd.append('genero_id', generoId || '1');
+
+            if (albumId && albumId.trim() !== '') {
+                fd.append('album_id', albumId);
+            }
+
+            if (anioLanzamiento && anioLanzamiento.trim() !== '') {
+                fd.append('anio_lanzamiento', anioLanzamiento);
+            }
+
+            const url = cancionActual.id ? `/canciones/${cancionActual.id}` : '/canciones/';
+            const method = cancionActual.id ? 'PUT' : 'POST';
+
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            }
+
+            try {
+                const res = await fetch(url, { method: method, body: fd });
+
+                const contentType = res.headers.get("content-type");
+                let data;
+
+                if (contentType && contentType.includes("application/json")) {
+                    data = await res.json();
+                } else {
+                    const text = await res.text();
+                    console.error("❌ Respuesta no-JSON:", text);
+                    throw new Error("El servidor devolvió un error HTML");
+                }
+
+                if (res.ok) {
+                    console.log('✅ Canción guardada:', data);
+                    mostrarExito(data.mensaje || "✅ Guardado exitosamente");
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    console.error('❌ Error del servidor:', data);
+                    mostrarError('can-error-msg', data.detail || "Error desconocido");
+                }
+            } catch (e) {
+                console.error("🔥 Error completo:", e);
+                mostrarError('can-error-msg', "❌ Error: " + e.message);
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = originalText || '<i class="fas fa-check"></i>';
+                }
+            }
+        }
+
+        /**
+         * 🗑️ ELIMINAR CANCIÓN
+         */
+        async function eliminarCancion(id) {
+            if (!confirm("¿Estás seguro de eliminar esta canción?")) {
+                return;
+            }
+
+            console.log('🗑️ Eliminando canción ID:', id);
+
+            try {
+                const res = await fetch(`/canciones/${id}`, { method: 'DELETE' });
+                const data = await res.json();
+
+                if (res.ok) {
+                    console.log('✅ Canción eliminada');
+                    mostrarExito(data.mensaje || "✅ Canción eliminada");
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    alert("❌ Error al eliminar: " + (data.detail || "Error desconocido"));
+                }
+            } catch (e) {
+                console.error('🔥 Error al eliminar:', e);
+                alert("❌ Error de conexión");
+            }
+        }
+
+        /**
+         * ❌ CERRAR MODAL
+         */
+        function cerrarModalCancion() {
+            const overlay = document.getElementById('modal-cancion-form');
+            if (overlay) {
+                overlay.style.display = 'none';
+            }
+        }
 
 
     </script>

@@ -3,6 +3,8 @@ from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlmodel import Session, select
 from typing import Optional
+
+# --- DEPENDENCIAS Y SERVICIOS ---
 from app.dependencies import get_session
 from app.services.music_service import MusicService
 from app.services.analytics_service import AnalyticsService
@@ -13,6 +15,7 @@ from app.repositories.albumes_repo import AlbumRepository
 from app.repositories.canciones_repo import CancionRepository
 from app.repositories.generos_repo import GeneroRepository
 
+from app.models.generos import Genero
 # --- MODELOS ---
 from app.models.favoritos import Favorito
 from app.models.canciones import Cancion
@@ -25,6 +28,9 @@ router = APIRouter(prefix="/web", tags=["Web Interface"])
 templates = Jinja2Templates(directory="templates")
 
 
+# ==============================================================================
+# RUTA PRINCIPAL (DASHBOARD)
+# ==============================================================================
 @router.get("/")
 async def dashboard(
         request: Request,
@@ -204,56 +210,55 @@ def sugerencias(q: str, session: Session = Depends(get_session)):
     return resultados
 
 
-@router.get("/api/artist_data/{id_artista}")
-def get_artist_data(id_artista: int, session: Session = Depends(get_session)):
-    """
-    Endpoint CRÍTICO para el Modal de Artista.
-    Devuelve toda la info: Bio, Álbumes y Canciones asociadas.
-    """
-    repo = ArtistaRepository(session)
-    artista = repo.get_by_id(id_artista)
+# ============================================================================
+# API PARA EL FRONTEND (DENTRO DE web_router.py)
+# ============================================================================
 
-    if not artista:
-        return {"error": "Artista no encontrado"}
-
-    # Estructura de respuesta
-    response = {
-        "id": artista.id_artista,
-        "nombre": artista.nombre,
-        "nacionalidad": artista.nacionalidad,
-        "biografia": artista.biografia,
-        "foto": artista.foto,
-        "albumes": [],
-        "canciones": []
-    }
-
-    # Cargar relaciones manualmente para asegurar consistencia
+@router.get("/api/song_data/{id_cancion}")
+def get_song_data(id_cancion: int, session: Session = Depends(get_session)):
+    """API para obtener datos enriquecidos de una canción"""
     try:
-        # Álbumes
-        albumes = session.exec(select(Album).where(Album.artista_principal_id == id_artista)).all()
-        for alb in albumes:
-            response["albumes"].append({
-                "id": alb.id_album,
-                "nombre": alb.nombre,
-                "anio": alb.anio_lanzamiento,
-                "foto": alb.foto_portada
-            })
+        cancion = session.get(Cancion, id_cancion)
+        if not cancion:
+            raise HTTPException(status_code=404, detail="Canción no encontrada")
 
-        # Canciones
-        canciones = session.exec(select(Cancion).where(Cancion.artista_id == id_artista)).all()
-        for can in canciones:
-            response["canciones"].append({
-                "id": can.id_cancion,
-                "titulo": can.titulo,
-                "duracion": can.duracion,
-                "album_id": can.album_id
-            })
+        # Cargar relaciones
+        artista = session.get(Artista, cancion.artista_id) if cancion.artista_id else None
+        album = session.get(Album, cancion.album_id) if cancion.album_id else None
+        genero = session.get(Genero, cancion.genero_id) if cancion.genero_id else None
+
+        # Determinar foto
+        foto = None
+        if album and hasattr(album, 'foto_portada') and album.foto_portada:
+            foto = album.foto_portada
+        elif artista and hasattr(artista, 'foto') and artista.foto:
+            foto = artista.foto
+
+        return {
+            "id": cancion.id_cancion,
+            "titulo": cancion.titulo,
+            "duracion": cancion.duracion,
+            "anio": cancion.anio_lanzamiento,  # ⚠️ MAPEO CORRECTO
+            "artista_id": cancion.artista_id,
+            "artista_nombre": artista.nombre if artista else "Desconocido",
+            "album_id": cancion.album_id,
+            "album_nombre": album.nombre if album else "Sencillo / Sin Álbum",
+            "genero_id": cancion.genero_id,
+            "genero_nombre": genero.nombre if genero else "General",
+            "foto": foto
+        }
+
+    except HTTPException:
+        raise
+
     except Exception as e:
-        print(f"Error cargando relaciones del artista: {e}")
-
-    return response
-
-
+        print(f"🔥 ERROR en get_song_data: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error interno: {str(e)}"
+        )
 @router.post("/like/{id_cancion}")
 def toggle_like(id_cancion: int, request: Request, session: Session = Depends(get_session)):
     """Maneja el Like/Dislike de canciones locales"""
@@ -319,8 +324,9 @@ def get_album_data(id_album: int, session: Session = Depends(get_session)):
     artista = repo_art.get_by_id(album.artista_principal_id)
     artista_nombre = artista.nombre if artista else "Desconocido"
 
+    # Obtener canciones
     canciones = session.exec(select(Cancion).where(Cancion.album_id == id_album)).all()
-   
+
     return {
         "id": album.id_album,
         "nombre": album.nombre,
