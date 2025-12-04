@@ -32,6 +32,12 @@
             from { opacity: 0; transform: translateY(-5px); }
             to { opacity: 1; transform: translateY(0); }
         }
+        #opciones-crear button:hover {
+            background: rgba(255,255,255,0.2) !important;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+
     </style>
 </head>
 <body>
@@ -312,20 +318,32 @@
 
             {% if busqueda and not artistas and not albumes and not canciones and not generos %}
                 <div style="text-align:center; margin-top:50px;">
-                    <h2 style="color:white;">No encontrado en tu biblioteca</h2>
-                    <p style="color:#888; margin:20px 0;">¿Quieres buscar en Spotify o crear uno nuevo?</p>
+                    <h2 style="color:white; margin-bottom:10px;">No encontrado en tu biblioteca</h2>
+                    <p style="color:rgba(255,255,255,0.6); margin-bottom:30px;">¿Quieres buscar en Spotify o crear uno nuevo?</p>
 
-                    <div style="display:flex; gap:15px; justify-content:center; margin:20px 0;">
-                        <button class="btn-spotify" onclick="buscarEnSpotify('{{ busqueda }}')">
+                    <div style="display:flex; gap:15px; justify-content:center; margin-bottom:30px;">
+                        <button class="btn-spotify" onclick="buscarEnSpotify('{{ busqueda }}')" style="padding:12px 25px; font-size:14px;">
                             <i class="fab fa-spotify"></i> Buscar en Spotify
                         </button>
-                        <button class="btn-play-hero" onclick="mostrarOpcionesCrear()">
+                        <button class="btn-play-hero" onclick="mostrarOpcionesCrear()" style="padding:12px 25px; font-size:14px; background:var(--c-pink);">
                             <i class="fas fa-plus"></i> Crear Nuevo
                         </button>
                     </div>
 
-                    <!-- Contenedor para mostrar resultados de Spotify -->
-                    <div id="resultados-spotify" style="margin-top:30px;"></div>
+                    <!-- Botones de creación individual (ocultos por defecto) -->
+                    <div id="opciones-crear" style="display:none; gap:10px; justify-content:center; flex-wrap:wrap;">
+                        <button onclick="abrirFormularioArtista()" style="background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); color:white; padding:10px 20px; border-radius:8px; cursor:pointer; transition:0.2s;">
+                            <i class="fas fa-user-plus"></i> Nuevo Artista
+                        </button>
+                        <button onclick="document.getElementById('modal-album-form').style.display='flex'" style="background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); color:white; padding:10px 20px; border-radius:8px; cursor:pointer; transition:0.2s;">
+                            <i class="fas fa-compact-disc"></i> Nuevo Álbum
+                        </button>
+                        <button onclick="abrirModalCancionSimple()" style="background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); color:white; padding:10px 20px; border-radius:8px; cursor:pointer; transition:0.2s;">
+                            <i class="fas fa-music"></i> Nueva Canción
+                        </button>
+                    </div>
+
+                    <div id="resultados-spotify"></div>
                 </div>
             {% endif %}
 
@@ -2371,7 +2389,14 @@
                 mostrarError('can-error-msg', "❌ Error: " + e.message);
             }
         }
-
+        function mostrarOpcionesCrear() {
+            const div = document.getElementById('opciones-crear');
+            if (div.style.display === 'none' || div.style.display === '') {
+                div.style.display = 'flex';
+            } else {
+                div.style.display = 'none';
+            }
+        }
 
     </script>
 </body>
