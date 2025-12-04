@@ -15,8 +15,9 @@ async def track_event(
     """
     Endpoint Genérico para recibir cualquier evento del Frontend.
     Payload esperado: { "type": "play", "data": { ... } }
+    Soporte para usuarios anónimos.
     """
-    # Intentar obtener usuario (si hay login)
+    # Obtener usuario (autenticado o anónimo)
     user = request.session.get("user")
     user_id = user['uid'] if user else "anonimo"
 

@@ -267,7 +267,9 @@ class MusicService:
             return ""
 
     def importar_inteligente(self, spotify_id, tipo):
-        if not self.sp_client: return {"mensaje": "Error cliente Spotify"}
+        if not self.sp_client:
+            return {"mensaje": "Error cliente Spotify"}
+
         try:
             name = ""
             if tipo == 'artist':
@@ -276,62 +278,161 @@ class MusicService:
                 name = self.sp_client.album(spotify_id)['artists'][0]['name']
             elif tipo == 'track':
                 name = self.sp_client.track(spotify_id)['artists'][0]['name']
-            if name: return self.importar_artista_desde_itunes(name)
+
+            if name:
+                return self.importar_artista_desde_itunes(name)
+
             return {"mensaje": "No identificado"}
+
         except Exception as e:
+            print(f"❌ Error importar_inteligente: {e}")
             return {"mensaje": f"Error: {e}"}
 
     def importar_artista_desde_itunes(self, nombre_artista: str):
-        if not self.sp_client: return {"mensaje": "Error: No hay conexión con Spotify."}
+        if not self.sp_client:
+            return {"mensaje": "Error: No hay conexión con Spotify."}
+
         try:
+            print(f"\n{'=' * 60}")
+            print(f"🎵 IMPORTANDO ARTISTA: {nombre_artista}")
+            print(f"{'=' * 60}")
+
+            # 1. BUSCAR ARTISTA EN SPOTIFY
             res = self.sp_client.search(q='artist:' + nombre_artista, type='artist', limit=1)
-            if not res['artists']['items']: return {"mensaje": "No encontrado"}
+            if not res['artists']['items']:
+                return {"mensaje": "No encontrado en Spotify"}
+
             data = res['artists']['items'][0]
-            nombre = data['name'];
+            nombre = data['name']
             foto = data['images'][0]['url'] if data['images'] else None
             genero = data['genres'][0].title() if data['genres'] else "General"
             bio = self.obtener_biografia_wikipedia(nombre)
 
-            if self.session:
-                g_db = self.repo_genero.buscar_por_nombre(genero)
-                g_id = g_db[0].id_genero if g_db else self.repo_genero.create(Genero(nombre=genero)).id_genero
-                a_db = self.repo_artista.buscar_por_nombre(nombre)
-                if a_db:
-                    art = a_db[0];
-                    art.foto = foto;
-                    art.biografia = bio
-                    self.session.add(art);
-                    self.session.commit();
-                    self.session.refresh(art);
-                    a_id = art.id_artista
-                else:
-                    a_id = self.repo_artista.create(
-                        Artista(nombre=nombre, genero_principal_id=g_id, foto=foto, biografia=bio)).id_artista
+            print(f"✅ Artista encontrado: {nombre}")
+            print(f"📸 Foto: {foto}")
+            print(f"🎸 Género: {genero}")
 
-                alb_res = self.sp_client.artist_albums(data['id'], album_type='album,single', limit=15)
-                for item in alb_res['items']:
-                    if not self.session.exec(select(Album).where(Album.nombre == item['name'])).first():
-                        f_date = item['release_date'][:4]
-                        anio = int(f_date) if f_date.isdigit() else 2024
-                        desc = f"{item['album_type'].title()} • {item['total_tracks']} canciones"
-                        self.repo_album.create(Album(nombre=item['name'], anio_lanzamiento=anio,
-                                                     foto_portada=item['images'][0]['url'] if item['images'] else None,
-                                                     descripcion=desc, artista_principal_id=a_id, genero_id=g_id))
+            if not self.session:
+                return {"mensaje": "Error: No hay sesión de BD"}
 
-                top = self.sp_client.artist_top_tracks(data['id'], country='CO')
-                for t in top['tracks']:
-                    if not self.session.exec(
-                            select(self.repo_cancion.model).where(self.repo_cancion.model.titulo == t['name'])).first():
-                        ms = t['duration_ms']
-                        dur = f"{int(ms / 60000)}:{int((ms % 60000) / 1000):02d}"
-                        self.repo_cancion.create(
-                            Cancion(titulo=t['name'], duracion=dur, artista_id=a_id, genero_id=g_id,
-                                    portada=t['album']['images'][0]['url'] if t['album']['images'] else None))
+            # 2. CREAR/OBTENER GÉNERO
+            g_db = self.repo_genero.buscar_por_nombre(genero)
+            if g_db:
+                g_id = g_db[0].id_genero
+                print(f"✅ Género existente ID: {g_id}")
+            else:
+                nuevo_genero = Genero(nombre=genero)
+                self.session.add(nuevo_genero)
+                self.session.flush()
+                g_id = nuevo_genero.id_genero
+                print(f"✨ Género creado ID: {g_id}")
 
-            return {"mensaje": f"¡{nombre} importado!", "artista": nombre}
+            # 3. CREAR/ACTUALIZAR ARTISTA
+            a_db = self.repo_artista.buscar_por_nombre(nombre)
+            if a_db:
+                art = a_db[0]
+                art.foto = foto
+                art.biografia = bio
+                art.genero_principal_id = g_id
+                self.session.add(art)
+                self.session.flush()
+                a_id = art.id_artista
+                print(f"🔄 Artista actualizado ID: {a_id}")
+            else:
+                nuevo_artista = Artista(
+                    nombre=nombre,
+                    genero_principal_id=g_id,
+                    foto=foto,
+                    biografia=bio
+                )
+                self.session.add(nuevo_artista)
+                self.session.flush()
+                a_id = nuevo_artista.id_artista
+                print(f"✨ Artista creado ID: {a_id}")
+
+            # 4. IMPORTAR ÁLBUMES
+            print(f"\n📀 Importando álbumes...")
+            alb_res = self.sp_client.artist_albums(data['id'], album_type='album,single', limit=15)
+            albumes_importados = 0
+
+            for item in alb_res['items']:
+                # Verificar si ya existe
+                existe = self.session.exec(
+                    select(Album).where(Album.nombre == item['name'])
+                ).first()
+
+                if not existe:
+                    f_date = item['release_date'][:4]
+                    anio = int(f_date) if f_date.isdigit() else 2024
+                    desc = f"{item['album_type'].title()} • {item['total_tracks']} canciones"
+
+                    nuevo_album = Album(
+                        nombre=item['name'],
+                        anio_lanzamiento=anio,
+                        foto_portada=item['images'][0]['url'] if item['images'] else None,
+                        descripcion=desc,
+                        artista_principal_id=a_id,
+                        genero_id=g_id
+                    )
+                    self.session.add(nuevo_album)
+                    albumes_importados += 1
+
+            self.session.flush()
+            print(f"✅ {albumes_importados} álbumes importados")
+
+            # 5. IMPORTAR TOP TRACKS (CANCIONES)
+            print(f"\n🎵 Importando canciones populares...")
+            top = self.sp_client.artist_top_tracks(data['id'], country='CO')
+            canciones_importadas = 0
+
+            for t in top['tracks']:
+                # Verificar si ya existe
+                existe = self.session.exec(
+                    select(Cancion).where(Cancion.titulo == t['name'])
+                ).first()
+
+                if not existe:
+                    ms = t['duration_ms']
+                    dur = f"{int(ms / 60000)}:{int((ms % 60000) / 1000):02d}"
+
+                    nueva_cancion = Cancion(
+                        titulo=t['name'],
+                        duracion=dur,
+                        artista_id=a_id,
+                        genero_id=g_id,
+                        portada=t['album']['images'][0]['url'] if t['album']['images'] else None
+                    )
+                    self.session.add(nueva_cancion)
+                    canciones_importadas += 1
+
+            # ⚠️ COMMIT FINAL CRÍTICO
+            self.session.commit()
+
+            print(f"✅ {canciones_importadas} canciones importadas")
+            print(f"\n{'=' * 60}")
+            print(f"🎉 IMPORTACIÓN COMPLETA: {nombre}")
+            print(f"{'=' * 60}\n")
+
+            return {
+                "mensaje": f"¡{nombre} importado exitosamente!",
+                "artista": nombre,
+                "detalles": {
+                    "albumes": albumes_importados,
+                    "canciones": canciones_importadas
+                }
+            }
+
         except Exception as e:
-            print(f"Error import: {e}")
-            return {"mensaje": "Error en importación"}
+            print(f"\n❌ ERROR EN IMPORTACIÓN: {e}")
+            import traceback
+            traceback.print_exc()
+
+            # Rollback en caso de error
+            if self.session:
+                self.session.rollback()
+
+            return {"mensaje": f"Error en importación: {str(e)}"}
+
 
     # 👇 PEGA ESTO DENTRO DE LA CLASE MusicService EN services/music_service.py 👇
 

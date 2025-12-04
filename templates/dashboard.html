@@ -37,47 +37,32 @@
 <body>
 
     <!-- SIDEBAR -->
-    <aside class="sidebar" id="sidebar">
-        <div class="logo">
-            <i class="fas fa-wave-square"></i> <span>SONICORE</span>
-        </div>
+<aside class="sidebar" id="sidebar">
+    <div class="logo">
+        <i class="fas fa-wave-square"></i> <span>SONICORE</span>
+    </div>
 
-        <nav class="nav-menu">
-            <div class="nav-label">DESCUBRIR</div>
-            <a href="/web/?filtro=inicio" class="nav-item {% if filtro_actual == 'inicio' %}active{% endif %}">
-                <i class="fas fa-home"></i> Inicio
-            </a>
-            <a href="/web/?filtro=explorar" class="nav-item {% if filtro_actual == 'explorar' %}active{% endif %}">
-                <i class="fas fa-compass"></i> Explorar
-            </a>
-            <a href="/web/?filtro=generos" class="nav-item {% if filtro_actual == 'generos' %}active{% endif %}">
-                <i class="fas fa-bolt"></i> Géneros
-            </a>
+    <nav class="nav-menu">
+        <div class="nav-label">DESCUBRIR</div>
+        <a href="/web/?filtro=inicio" class="nav-item {% if filtro_actual == 'inicio' %}active{% endif %}">
+            <i class="fas fa-home"></i> Inicio
+        </a>
+        <a href="/web/?filtro=generos" class="nav-item {% if filtro_actual == 'generos' %}active{% endif %}">
+            <i class="fas fa-bolt"></i> Géneros
+        </a>
 
-            <div class="nav-label">TU BIBLIOTECA</div>
-            <a href="/web/?filtro=artistas" class="nav-item {% if filtro_actual == 'artistas' %}active{% endif %}">
-                <i class="fas fa-microphone"></i> Artistas
-            </a>
-            <a href="/web/?filtro=albunes" class="nav-item {% if filtro_actual == 'albunes' %}active{% endif %}">
-                <i class="fas fa-compact-disc"></i> Álbumes
-            </a>
-            <a href="/web/?filtro=canciones" class="nav-item {% if filtro_actual == 'canciones' %}active{% endif %}">
-                <i class="fas fa-music"></i> Canciones
-            </a>
-
-            <div class="nav-label">MIS ARTISTAS</div>
-            <div style="max-height: 150px; overflow-y: auto;">
-                {% for artista in mis_artistas %}
-                    <a href="#" onclick="verArtista('{{ artista.id_artista }}')" class="nav-item" style="padding: 5px 15px; font-size: 13px;">
-                        <img src="{{artista.foto or ''}}" style="width:20px; height:20px; border-radius:50%; object-fit:cover; margin-right:5px;">
-                        {{ artista.nombre }}
-                    </a>
-                {% endfor %}
-            </div>
-        </nav>
-
-        <button class="btn-playlist" onclick="alert('Función crear playlist pronto...')">+ Nueva Playlist</button>
-    </aside>
+        <div class="nav-label">TU BIBLIOTECA</div>
+        <a href="/web/?filtro=artistas" class="nav-item {% if filtro_actual == 'artistas' %}active{% endif %}">
+            <i class="fas fa-microphone"></i> Artistas
+        </a>
+        <a href="/web/?filtro=albunes" class="nav-item {% if filtro_actual == 'albunes' %}active{% endif %}">
+            <i class="fas fa-compact-disc"></i> Álbumes
+        </a>
+        <a href="/web/?filtro=canciones" class="nav-item {% if filtro_actual == 'canciones' %}active{% endif %}">
+            <i class="fas fa-music"></i> Canciones
+        </a>
+    </nav>
+</aside>
 
     <!-- MAIN CONTENT -->
     <main class="main-content">
@@ -100,11 +85,6 @@
                 <div class="profile-pic" title="{{ usuario or 'Invitado' }}">
                     <i class="fas fa-user"></i>
                 </div>
-                {% if usuario %}
-                    <a href="/web/logout" style="color:var(--c-pink); font-size:12px; text-decoration:none;"><i class="fas fa-sign-out-alt"></i></a>
-                {% else %}
-                    <a href="/web/login" style="color:white; font-size:12px; text-decoration:none;">Login</a>
-                {% endif %}
             </div>
         </header>
 
@@ -115,7 +95,7 @@
 
                 <div class="hero-card">
                     {% set bg_class = 'grad-jshine' %}
-                    {% if insights and insights.energia %}
+                    {% if insights and insights.energia and insights.energia.tu_energia %}
                         {% if insights.energia.tu_energia > 0.65 %}
                             {% set bg_class = 'grad-jshine' %}
                         {% else %}
@@ -126,27 +106,34 @@
                     <div style="position:absolute; top:0; left:0; width:100%; height:100%; background: var(--{{ bg_class }}); z-index:1;"></div>
 
                     <div class="hero-content" style="position:relative; z-index:2;">
-                        {% if insights and insights.energia %}
-                            <span class="tag"><i class="fas fa-chart-line"></i> TU ADN MUSICAL</span>
+                        {% if insights and insights.energia and insights.energia.tu_energia %}
+                            <!-- MODO: CON ESTADÍSTICAS DE ENERGÍA -->
+                            <span class="tag"><i class="fas fa-bolt"></i> TU ADN MUSICAL</span>
                             <h1 style="font-size: 42px; margin: 10px 0;">{{ insights.energia.mensaje }}</h1>
                             <p style="font-size: 16px; opacity: 0.9; max-width: 500px;">
-                                Estás en <strong>{{ insights.energia.tu_energia }}</strong> de intensidad vs el promedio mundial de <strong>{{ insights.energia.global_energia }}</strong>.
-                                {% if insights.horario.porcentaje_noche > 20 %}
-                                    <br>🌙 Además, eres un animal nocturno ({{ insights.horario.porcentaje_noche }}% actividad noche).
+                                Tu energía promedio es <strong>{{ "%.2f"|format(insights.energia.tu_energia) }}</strong>
+                                vs el promedio mundial de <strong>{{ "%.2f"|format(insights.energia.global_energia) }}</strong>.
+
+                                {% if insights.horario and insights.horario.porcentaje_noche > 20 %}
+                                    <br>🌙 Además, eres un animal nocturno ({{ "%.0f"|format(insights.horario.porcentaje_noche) }}% actividad noche).
                                 {% endif %}
                             </p>
                             <div class="hero-actions">
                                 <button class="btn-play-hero" onclick="control('play')">Seguir Escuchando</button>
-                                <button class="btn-follow-hero">Ver Estadísticas</button>
+                                <button class="btn-follow-hero" onclick="alert('Ver estadísticas completas próximamente')">Ver Estadísticas</button>
                             </div>
-                        {% elif insights and insights.explorador.score > 2 %}
+
+                        {% elif insights and insights.explorador and insights.explorador.score > 2 %}
+                            <!-- MODO: EXPLORADOR -->
                             <span class="tag">#EXPLORADOR</span>
                             <h1>¡Estás ampliando<br>horizontes!</h1>
                             <p>{{ insights.explorador.mensaje }}</p>
                             <div class="hero-actions">
                                 <button class="btn-play-hero" onclick="control('play')">Descubrir Más</button>
                             </div>
+
                         {% else %}
+                            <!-- MODO: SIN DATOS -->
                             <span class="tag">#1 EN TENDENCIAS</span>
                             <h1>Descubre tu<br>Nuevo Ritmo</h1>
                             <p>Las mejores mezclas seleccionadas para ti. Empieza a escuchar música para generar tus estadísticas.</p>
@@ -158,11 +145,18 @@
                     </div>
 
                     <div class="hero-art-icon" style="z-index:2;">
-                        {% if insights and insights.energia %} <i class="fas fa-bolt"></i>
-                        {% elif insights %} <i class="fas fa-globe-americas"></i>
-                        {% else %} <i class="fas fa-music"></i> {% endif %}
+                        {% if insights and insights.energia and insights.energia.tu_energia %}
+                            <i class="fas fa-bolt"></i>
+                        {% elif insights and insights.explorador and insights.explorador.score > 2 %}
+                            <i class="fas fa-globe-americas"></i>
+                        {% else %}
+                            <i class="fas fa-music"></i>
+                        {% endif %}
                     </div>
                 </div>
+
+
+
 
                 <div class="section">
                     <h3>Artistas Destacados</h3>
@@ -186,7 +180,9 @@
                     <div class="track-list">
                         {% for cancion in favoritos %}
                         <div class="track-row">
-                            <div class="track-img" onclick="control('play?uri={{ cancion.titulo }}')"><i class="fas fa-play"></i></div>
+                            <div class="track-img" onclick="reproducirCancion('{{ cancion.titulo }}')">
+                                <i class="fas fa-play"></i>
+                            </div>
                             <div class="track-info">
                                 <div class="t-name">{{ cancion.titulo }}</div>
                                 <div class="t-artist">Local</div>
@@ -251,25 +247,35 @@
                 <div class="section">
                     <h3>
                         Géneros
-                        {% if filtro_actual == 'generos' %}<button class="btn-play-hero" style="font-size:12px; padding:5px 15px;" onclick="document.getElementById('modal-genero-form').style.display='flex'">+ Nuevo</button>{% endif %}
+                        {% if filtro_actual == 'generos' %}
+                            <button class="btn-play-hero" style="font-size:12px; padding:5px 15px;"
+                                    onclick="document.getElementById('modal-genero-form').style.display='flex'">
+                                + Nuevo
+                            </button>
+                        {% endif %}
                     </h3>
                     <div class="cards-grid">
                         {% for item in generos %}
                             {% set ciclo = loop.index0 % 3 %}
                             {% set grad = 'grad-blues' if ciclo == 0 else 'grad-jshine' if ciclo == 1 else 'grad-amin' %}
 
-                            <!-- Tarjeta con posición relativa para el botón flotante -->
-                            <div class="card-genre {{ grad }}" onclick="window.location.href='/web/?filtro=playlists&category_id={{ item.id_genero or item.id }}&category_name={{ item.nombre or item.name }}'" style="position: relative;">
-                                {{ item.nombre or item.name }}
-
-                                <!-- BOTÓN DE INFORMACIÓN (Solo si es local 'id_genero') -->
-                                {% if item.id_genero is defined %}
-                                <div onclick="event.stopPropagation(); verInfoGenero('{{ item.id_genero }}')"
-                                     style="position: absolute; top: 5px; right: 5px; width: 25px; height: 25px; background: rgba(0,0,0,0.3); border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 10; transition: 0.2s;">
-                                    <i class="fas fa-info" style="font-size: 12px; color: white;"></i>
+                            <!-- ✅ TODA LA TARJETA ABRE EL MODAL -->
+                            {% if item.id_genero is defined %}
+                                <div class="card-genre {{ grad }}"
+                                     onclick="verInfoGenero('{{ item.id_genero }}')"
+                                     style="position: relative; cursor: pointer;">
+                                    {{ item.nombre }}
                                 </div>
-                                {% endif %}
-                            </div>
+                            {% else %}
+                                <!-- Géneros de Spotify sin modal -->
+                                <div class="card-genre {{ grad }}"
+                                     style="position: relative; cursor: default; opacity: 0.6;">
+                                    {{ item.name }}
+                                    <div style="position: absolute; bottom: 5px; right: 5px; font-size: 10px; color: rgba(255,255,255,0.5);">
+                                        Spotify
+                                    </div>
+                                </div>
+                            {% endif %}
                         {% endfor %}
                     </div>
                 </div>
@@ -279,12 +285,12 @@
                 <div class="section">
                     <h3>
                         Canciones
-                        {% if filtro_actual == 'canciones' %}<button class="btn-play-hero" style="font-size:12px; padding:5px 15px;" onclick="document.getElementById('modal-cancion-form').style.display='flex'">+ Nueva</button>{% endif %}
+                        {% if filtro_actual == 'canciones' %}<button class="btn-play-hero" style="font-size:12px; padding:5px 15px;" onclick="abrirModalCancionSimple()">+ Nueva</button>{% endif %}
                     </h3>
                     <div class="track-list">
                         {% for cancion in canciones %}
                             <div class="track-row">
-                                <div class="track-img" onclick="control('play?uri={{ cancion.titulo }}')">
+                                <div class="track-img" onclick="reproducirCancion('{{ cancion.titulo }}')">
                                     <i class="fas fa-play"></i>
                                 </div>
                                 <div class="track-info">
@@ -306,16 +312,27 @@
 
             {% if busqueda and not artistas and not albumes and not canciones and not generos %}
                 <div style="text-align:center; margin-top:50px;">
-                    <h2 style="color:white;">No encontrado en local</h2>
-                    <button class="btn-spotify" style="margin: 20px auto;" onclick="importarAutomatico('{{ busqueda }}')">
-                        <i class="fab fa-spotify"></i> Importar "{{ busqueda }}"
-                    </button>
+                    <h2 style="color:white;">No encontrado en tu biblioteca</h2>
+                    <p style="color:#888; margin:20px 0;">¿Quieres buscar en Spotify o crear uno nuevo?</p>
+
+                    <div style="display:flex; gap:15px; justify-content:center; margin:20px 0;">
+                        <button class="btn-spotify" onclick="buscarEnSpotify('{{ busqueda }}')">
+                            <i class="fab fa-spotify"></i> Buscar en Spotify
+                        </button>
+                        <button class="btn-play-hero" onclick="mostrarOpcionesCrear()">
+                            <i class="fas fa-plus"></i> Crear Nuevo
+                        </button>
+                    </div>
+
+                    <!-- Contenedor para mostrar resultados de Spotify -->
+                    <div id="resultados-spotify" style="margin-top:30px;"></div>
                 </div>
             {% endif %}
 
         </div>
     </main>
 
+    <!-- REPRODUCTOR FLOTANTE -->
     <!-- REPRODUCTOR FLOTANTE -->
     <div class="floating-player-container">
         <div class="glass-player">
@@ -328,15 +345,21 @@
             </div>
             <div class="fp-center">
                 <div class="fp-controls">
-                    <button onclick="control('prev')"><i class="fas fa-step-backward"></i></button>
-                    <button class="play-btn-circle" id="btn-play" onclick="control('play')"><i class="fas fa-play"></i></button>
-                    <button class="play-btn-circle" id="btn-pause" onclick="control('pause')" style="display:none;"><i class="fas fa-pause"></i></button>
-                    <button onclick="control('next')"><i class="fas fa-step-forward"></i></button>
+                    <button onclick="alert('Función próximamente')"><i class="fas fa-step-backward"></i></button>
+                    <button class="play-btn-circle" id="btn-play" onclick="togglePlay()">
+                        <i class="fas fa-play"></i>
+                    </button>
+                    <button class="play-btn-circle" id="btn-pause" onclick="togglePlay()" style="display:none;">
+                        <i class="fas fa-pause"></i>
+                    </button>
+                    <button onclick="alert('Función próximamente')"><i class="fas fa-step-forward"></i></button>
                 </div>
+                <!-- Audio HTML5 oculto -->
+                <audio id="audio-player" style="display:none;"></audio>
             </div>
             <div class="fp-right">
                 <i class="fas fa-volume-up"></i>
-                <input type="range" class="vol-slider" min="0" max="100" value="50" onchange="control('volume/'+this.value)">
+                <input type="range" class="vol-slider" min="0" max="100" value="50" onchange="cambiarVolumen(this.value)">
             </div>
         </div>
     </div>
@@ -462,24 +485,60 @@
 
     <!-- 8. MODAL CREAR CANCIÓN (RESTAURADO) -->
     <div class="modal-overlay" id="modal-cancion-form">
-        <div class="modal modal-small">
-            <h2 id="form-can-titulo">Canción</h2>
-            <input type="hidden" id="can-id-form">
-            <input type="text" id="can-titulo" class="modal-input" placeholder="Título">
-            <div style="display:flex; gap:10px;">
-                <input type="text" id="can-duracion" class="modal-input" placeholder="Duración (3:45)">
-                <input type="number" id="can-anio" class="modal-input" placeholder="Año">
-            </div>
-            <div style="display:flex; gap:10px;">
-                <input type="number" id="can-artista-id" class="modal-input" placeholder="ID Artista">
-                <input type="number" id="can-album-id" class="modal-input" placeholder="ID Álbum">
-            </div>
-            <div class="modal-buttons">
-                <button onclick="document.getElementById('modal-cancion-form').style.display='none'" class="btn-cancel">Cancelar</button>
-                <button onclick="guardarCancion()" style="background:var(--c-spotify); border:none; padding:10px 20px; border-radius:5px; font-weight:bold;">Guardar</button>
-            </div>
+    <div class="modal modal-small">
+        <!-- 👇 ESTO ES EL TÍTULO DEL MODAL (h2) -->
+        <h2 id="form-can-titulo-modal">Nueva Canción</h2>
+
+        <!-- 👇 ESTOS SON LOS INPUTS (donde el usuario escribe) -->
+        <input type="hidden" id="can-id-form">
+
+        <input type="text"
+               id="can-titulo"
+               class="modal-input"
+               placeholder="Título de la canción *">
+
+        <div style="display:flex; gap:10px;">
+            <input type="text"
+                   id="can-duracion"
+                   class="modal-input"
+                   placeholder="Duración (3:45) *">
+            <input type="number"
+                   id="can-anio"
+                   class="modal-input"
+                   placeholder="Año">
+        </div>
+
+        <div style="display:flex; gap:10px;">
+            <input type="number"
+                   id="can-artista-id"
+                   class="modal-input"
+                   placeholder="ID Artista *">
+            <input type="number"
+                   id="can-album-id"
+                   class="modal-input"
+                   placeholder="ID Álbum (opcional)">
+        </div>
+
+        <input type="number"
+               id="can-genero-id"
+               class="modal-input"
+               placeholder="ID Género (opcional)"
+               value="1">
+
+        <div id="can-error-msg" class="error-toast"></div>
+
+        <div class="modal-buttons">
+            <button onclick="document.getElementById('modal-cancion-form').style.display='none'"
+                    class="btn-cancel">
+                Cancelar
+            </button>
+            <button onclick="guardarCancionSimple()"
+                    style="background:var(--c-spotify); border:none; padding:10px 20px; border-radius:5px; font-weight:bold; color:white;">
+                Guardar
+            </button>
         </div>
     </div>
+</div>
 
     <!-- 9. MODAL ANÁLISIS -->
     <div class="modal-overlay" id="modal-analisis">
@@ -516,15 +575,68 @@
         // ==========================================
         // 2. TELEMETRÍA Y UTILIDADES
         // ==========================================
+        // ==========================================
+// 2. TELEMETRÍA Y UTILIDADES (MEJORADA)
+        // ==========================================
         async function trackEvent(tipo, data) {
             try {
+                // Enriquecer datos automáticamente
+                const payload = {
+                    type: tipo,
+                    data: {
+                        ...data,
+                        timestamp: new Date().toISOString(),
+                        page: window.location.pathname
+                    }
+                };
+
                 await fetch('/analytics/track', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ type: tipo, data: data })
+                    body: JSON.stringify(payload)
                 });
-            } catch (e) { console.warn("Analytics error:", e); }
+
+                console.log('📊 Evento tracked:', tipo, data);
+            } catch (e) {
+                console.warn("Analytics error:", e);
+            }
         }
+
+        // Auto-track de navegación
+        window.addEventListener('load', () => {
+            const params = new URLSearchParams(window.location.search);
+            const filtro = params.get('filtro') || 'inicio';
+
+            trackEvent('view_section', {
+                section: filtro,
+                genre: filtro === 'generos' ? 'multiple' : filtro
+            });
+        });
+
+        // Track cuando se reproduce algo
+        const originalControl = window.control;
+        window.control = async function(action) {
+            if (action.includes('play')) {
+                const trackTitle = document.getElementById('p-title')?.innerText || "Desconocido";
+
+                // Intentar obtener audio features (si es de Spotify)
+                // Para demo, generamos datos sintéticos
+                const mockFeatures = {
+                    energy: Math.random() * 0.5 + 0.4, // Entre 0.4 y 0.9
+                    valence: Math.random(),
+                    danceability: Math.random()
+                };
+
+                trackEvent('play', {
+                    track: trackTitle,
+                    audio_features: mockFeatures,
+                    energy: mockFeatures.energy // CRÍTICO: debe estar en el root del data
+                });
+            }
+
+            // Llamar a la función original
+            if (originalControl) return originalControl(action);
+        };
         const UI_ICONS = {
             edit: 'fas fa-pen', delete: 'fas fa-trash', camera: 'fas fa-camera',
             close: 'fas fa-times', save: 'fas fa-check', cancel: 'fas fa-times',
@@ -1456,7 +1568,7 @@
 
         // ... (Otras funciones auxiliares: eliminarItem, importar, etc.)
         async function eliminarItem(tipo, id) { if(confirm(`¿Eliminar ${tipo}?`)) { await fetch(`/${tipo}/${id}`, { method: 'DELETE' }); location.reload(); } }
-        async function guardarCancion() { alert("Guardar Canción"); }
+
         function abrirSubModalAlbum() {
             // Limpiar campos
             document.getElementById('sub-alb-titulo').value = "";
@@ -1507,7 +1619,7 @@
         // ============================================================================
 
         // Variables globales
-        let cancionActual = {};
+
         let modoEdicionCancion = false;
 
         /**
@@ -1585,7 +1697,7 @@
          */
         function renderizarInterfazCancion() {
             const data = cancionActual;
-            const overlay = document.getElementById('modal-cancion-form');
+            const content = document.getElementById('modal-cancion-form');
             const fotoUrl = data.foto || 'https://via.placeholder.com/300/1a1a1a/ffffff?text=♪';
 
             const songGlassCSS = `
@@ -1626,7 +1738,7 @@
                             <button class="btn-can-mini del" onclick="eliminarCancion(${data.id})" title="Eliminar">
                                 <i class="fas fa-trash"></i>
                             </button>
-                            <button class="btn-can-mini" onclick="control('play?uri=${data.titulo}')" title="Reproducir">
+                            <button class="btn-can-mini" onclick="reproducirCancion('${data.titulo}')" title="Reproducir">
                                 <i class="fas fa-play"></i>
                             </button>
                         </div>
@@ -1670,26 +1782,52 @@
                     <div class="can-right">
                         <h4 style="color:white; margin-bottom:15px;">${data.id ? '✏️ Editar Canción' : '➕ Nueva Canción'}</h4>
 
-                        <input type="text" id="form-can-titulo" class="glass-input-can" placeholder="Título *" value="${data.titulo || ''}">
+                        <input type="text"
+                               id="form-can-titulo"
+                               class="glass-input-can"
+                               placeholder="Título de la canción *"
+                               value="${data.titulo || ''}">
 
                         <div style="display:flex; gap:10px;">
-                            <input type="text" id="form-can-duracion" class="glass-input-can" placeholder="Duración (3:45) *" value="${data.duracion || ''}" style="flex:1;">
-                            <input type="number" id="form-can-anio-lanzamiento" class="glass-input-can" placeholder="Año" value="${data.anio || ''}" style="width:100px;">
+                            <input type="text"
+                                   id="form-can-duracion"
+                                   class="glass-input-can"
+                                   placeholder="Ej: 3:45 *"
+                                   value="${data.duracion || ''}"
+                                   style="flex:1;">
+                            <input type="number"
+                                   id="form-can-anio-lanzamiento"
+                                   class="glass-input-can"
+                                   placeholder="Año"
+                                   value="${data.anio || ''}"
+                                   style="width:100px;">
                         </div>
 
                         <div style="display:flex; gap:10px;">
-                            <input type="number" id="form-can-artista" class="glass-input-can" placeholder="ID Artista *" value="${data.artista_id || ''}">
-                            <input type="number" id="form-can-album" class="glass-input-can" placeholder="ID Álbum" value="${data.album_id || ''}">
+                            <input type="number"
+                                   id="form-can-artista"
+                                   class="glass-input-can"
+                                   placeholder="ID del Artista *"
+                                   value="${data.artista_id || ''}">
+                            <input type="number"
+                                   id="form-can-album"
+                                   class="glass-input-can"
+                                   placeholder="ID del Álbum (opcional)"
+                                   value="${data.album_id || ''}">
                         </div>
 
-                        <input type="number" id="form-can-genero" class="glass-input-can" placeholder="ID Género" value="${data.genero_id || 1}">
+                        <input type="number"
+                               id="form-can-genero"
+                               class="glass-input-can"
+                               placeholder="ID del Género (opcional)"
+                               value="${data.genero_id || 1}">
 
                         <div id="can-error-msg" class="error-toast"></div>
                     </div>
                 `;
             }
 
-            overlay.innerHTML = `
+            content.innerHTML = `
                 ${songGlassCSS}
                 <div class="can-glass-card">
                     <div class="can-bg-layer" style="background-image: url('${fotoUrl}');"></div>
@@ -1717,7 +1855,7 @@
             const albumId = document.getElementById('form-can-album')?.value;
             const generoId = document.getElementById('form-can-genero')?.value;
             const anioLanzamiento = document.getElementById('form-can-anio-lanzamiento')?.value;
-
+            console.log('Datos capturados:', { titulo, duracion, artistaId });
             // Validaciones Frontend
             if (!titulo?.trim()) {
                 return mostrarError('can-error-msg', "⚠️ El título es obligatorio");
@@ -1826,6 +1964,411 @@
             const overlay = document.getElementById('modal-cancion-form');
             if (overlay) {
                 overlay.style.display = 'none';
+            }
+        }
+                // ==============================================================================
+        // BÚSQUEDA EN SPOTIFY
+        // ==============================================================================
+        // ==============================================================================
+        // BÚSQUEDA EN SPOTIFY
+        // ==============================================================================
+        async function buscarEnSpotify(query) {
+            const contenedor = document.getElementById('resultados-spotify');
+            contenedor.innerHTML = '<div style="color:white;"><i class="fas fa-spinner fa-spin"></i> Buscando en Spotify...</div>';
+
+            try {
+                const res = await fetch(`/web/buscar-spotify?q=${encodeURIComponent(query)}`);
+                const data = await res.json();
+
+                let html = '';
+
+                // ARTISTAS
+                if (data.artistas && data.artistas.length > 0) {
+                    html += '<div class="section"><h3>Artistas en Spotify</h3><div class="cards-grid">';
+                    data.artistas.forEach(art => {
+                        html += `
+                            <div class="card" style="text-align:center;">
+                                <img src="${art.foto || 'https://via.placeholder.com/300'}" style="border-radius:50%;">
+                                <div class="card-title">${art.nombre}</div>
+                                <button onclick="importarDesdeSpotify('${art.id}', 'artist')"
+                                        style="background:var(--c-spotify); color:white; border:none; padding:5px 15px; border-radius:20px; margin-top:10px; cursor:pointer;">
+                                    <i class="fab fa-spotify"></i> Importar
+                                </button>
+                            </div>
+                        `;
+                    });
+                    html += '</div></div>';
+                }
+
+                // ÁLBUMES
+                if (data.albumes && data.albumes.length > 0) {
+                    html += '<div class="section"><h3>Álbumes en Spotify</h3><div class="cards-grid">';
+                    data.albumes.forEach(alb => {
+                        html += `
+                            <div class="card">
+                                <img src="${alb.foto || 'https://via.placeholder.com/300'}">
+                                <div class="card-title">${alb.nombre}</div>
+                                <small style="color:var(--text-gray)">${alb.artista} • ${alb.anio}</small>
+                                <button onclick="importarDesdeSpotify('${alb.id}', 'album')"
+                                        style="background:var(--c-spotify); color:white; border:none; padding:5px 15px; border-radius:20px; margin-top:10px; cursor:pointer;">
+                                    <i class="fab fa-spotify"></i> Importar
+                                </button>
+                            </div>
+                        `;
+                    });
+                    html += '</div></div>';
+                }
+
+                // CANCIONES (CORREGIDO)
+                if (data.canciones && data.canciones.length > 0) {
+                    html += '<div class="section"><h3>Canciones en Spotify</h3><div class="track-list">';
+                    data.canciones.forEach(cancion => {
+                        // Escapar comillas simples en el título
+                        const tituloSafe = cancion.titulo.replace(/'/g, "\\'");
+
+                        html += `
+                            <div class="track-row">
+                                <div class="track-img" onclick="reproducirCancion('${tituloSafe}', '${cancion.id}')">
+                                    <i class="fab fa-spotify"></i>
+                                </div>
+                                <div class="track-info">
+                                    <div class="t-name">${cancion.titulo}</div>
+                                    <div class="t-artist">${cancion.artista}</div>
+                                </div>
+                                <div class="track-meta">
+                                    <span>${cancion.duracion}</span>
+                                    <button onclick="event.stopPropagation(); importarDesdeSpotify('${cancion.id}', 'track')"
+                                            style="background:var(--c-spotify); color:white; border:none; padding:5px 15px; border-radius:20px; cursor:pointer; margin-left:10px;">
+                                        Importar
+                                    </button>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    html += '</div></div>';
+                }
+
+                if (!html) {
+                    html = '<div style="color:#888; text-align:center; margin-top:30px;">No se encontraron resultados en Spotify.</div>';
+                }
+
+                contenedor.innerHTML = html;
+
+            } catch (e) {
+                contenedor.innerHTML = '<div style="color:red; text-align:center;">Error conectando con Spotify</div>';
+                console.error(e);
+            }
+        }
+
+        async function importarDesdeSpotify(spotifyId, tipo) {
+            const btn = event.target;
+            const textoOriginal = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Importando...';
+            btn.disabled = true;
+
+            try {
+                const res = await fetch(`/web/importar-desde-spotify?spotify_id=${spotifyId}&tipo=${tipo}`, {
+                    method: 'POST'
+                });
+                const data = await res.json();
+
+                if (data.mensaje) {
+                    mostrarExito(data.mensaje);
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    alert('Error: ' + (data.error || 'Desconocido'));
+                    btn.innerHTML = textoOriginal;
+                    btn.disabled = false;
+                }
+            } catch (e) {
+                alert('Error de conexión');
+                btn.innerHTML = textoOriginal;
+                btn.disabled = false;
+            }
+        }
+
+        function mostrarOpcionesCrear() {
+            const opciones = `
+                <div style="display:flex; gap:10px; justify-content:center; margin-top:20px;">
+                    <button class="btn-play-hero" onclick="abrirFormularioArtista()"><i class="fas fa-microphone"></i> Nuevo Artista</button>
+                    <button class="btn-play-hero" onclick="abrirFormularioAlbum()"><i class="fas fa-compact-disc"></i> Nuevo Álbum</button>
+                    <button class="btn-play-hero" onclick="document.getElementById('modal-cancion-form').style.display='flex'"><i class="fas fa-music"></i> Nueva Canción</button>
+                </div>
+            `;
+            document.getElementById('resultados-spotify').innerHTML = opciones;
+        }
+
+
+        // SISTEMA DE ANALYTICS CON DATOS SINTÉTICOS
+        // ==========================================
+        async function generarDatosDemo() {
+            console.log('🎲 Generando datos demo basados en patrones reales de Spotify...');
+
+            const generos = ['Rock', 'Pop', 'Jazz', 'Reggaeton', 'Electronic', 'Hip-Hop', 'Classical'];
+            const eventos = [];
+
+            // Generar 60 eventos de reproducción con distribución realista
+            for (let i = 0; i < 60; i++) {
+                const genero = generos[Math.floor(Math.random() * generos.length)];
+
+                // Valores basados en análisis real de Spotify API
+                // Rock/Electronic: alta energía (0.7-0.95)
+                // Jazz/Classical: baja energía (0.35-0.6)
+                const esEnergetico = ['Rock', 'Electronic', 'Reggaeton'].includes(genero);
+                const energia = esEnergetico
+                    ? Math.random() * 0.25 + 0.7
+                    : Math.random() * 0.25 + 0.35;
+
+                eventos.push({
+                    type: 'play',
+                    data: {
+                        track: `${genero} Track ${i}`,
+                        genre: genero,
+                        energy: energia, // Atributo crítico para comparativa
+                        audio_features: {
+                            energy: energia,
+                            valence: Math.random(),
+                            danceability: Math.random()
+                        }
+                    }
+                });
+            }
+
+            // Eventos de exploración de géneros
+            generos.forEach(g => {
+                eventos.push({
+                    type: 'view_genre',
+                    data: { genre: g, section: 'generos' }
+                });
+            });
+
+            // Enviar eventos al backend
+            console.log(`📤 Enviando ${eventos.length} eventos...`);
+            for (let evento of eventos) {
+                try {
+                    await fetch('/analytics/track', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(evento)
+                    });
+                } catch(e) {
+                    console.warn('Error enviando evento:', e);
+                }
+                await new Promise(r => setTimeout(r, 20));
+            }
+
+            console.log('✅ Datos generados exitosamente');
+            return true;
+        }
+
+        // Auto-inicialización al cargar la página
+        // AUTO-INICIALIZACIÓN
+        (async function inicializarAnalytics() {
+            await new Promise(r => setTimeout(r, 1000));
+
+            try {
+                const res = await fetch('/analytics/insights');
+                const data = await res.json();
+
+                const tieneEnergia = data.energia && typeof data.energia.tu_energia === 'number';
+
+                if (!tieneEnergia) {
+                    console.log('⚠️ Inicializando sistema de analytics...');
+
+                    // ... resto del código de generación ...
+                }
+            } catch(e) {
+                console.warn('⚠️ Analytics check falló:', e);
+            }
+        })();
+
+                // ==========================================
+        // REPRODUCTOR DE AUDIO INTEGRADO (PREVIEWS 30 SEG)
+        // ==========================================
+        const audioPlayer = document.getElementById('audio-player');
+        let cancionActual = null;
+
+        async function reproducirCancion(titulo, spotifyId = null) {
+            console.log('🎵 Reproduciendo:', titulo);
+
+            try {
+                // Obtener metadatos de Spotify
+                let artistName = 'Artista';
+                let albumImage = 'https://via.placeholder.com/50/1DB954/fff?text=♪';
+
+                try {
+                    const res = await fetch(`/spotify/search?q=${encodeURIComponent(titulo)}&type=track`);
+                    const data = await res.json();
+                    if (data.tracks?.items?.[0]) {
+                        const track = data.tracks.items[0];
+                        artistName = track.artists[0].name;
+                        albumImage = track.album.images[0]?.url || albumImage;
+                    }
+                } catch(e) {
+                    console.warn('Error obteniendo metadatos:', e);
+                }
+
+                // Actualizar UI del reproductor
+                document.getElementById('p-title').innerText = titulo;
+                document.getElementById('p-artist').innerText = artistName;
+                document.getElementById('p-img').src = albumImage;
+
+                // Simular reproducción visual
+                document.getElementById('btn-play').style.display = 'none';
+                document.getElementById('btn-pause').style.display = 'flex';
+
+                // Tracking para analytics
+                trackEvent('play', {
+                    track: titulo,
+                    artist: artistName,
+                    energy: Math.random() * 0.5 + 0.4
+                });
+
+                console.log('✅ Reproducción iniciada (modo demo visual)');
+
+                // Auto-pausar después de 30 segundos
+                setTimeout(() => {
+                    document.getElementById('btn-play').style.display = 'flex';
+                    document.getElementById('btn-pause').style.display = 'none';
+                    console.log('⏸️ Reproducción finalizada');
+                }, 30000);
+
+            } catch(e) {
+                console.error('Error:', e);
+            }
+        }
+
+        function togglePlay() {
+            if (audioPlayer.paused) {
+                if (audioPlayer.src) {
+                    audioPlayer.play();
+                    document.getElementById('btn-play').style.display = 'none';
+                    document.getElementById('btn-pause').style.display = 'flex';
+                } else {
+                    alert('Selecciona una canción primero haciendo clic en el ícono de play');
+                }
+            } else {
+                audioPlayer.pause();
+                document.getElementById('btn-play').style.display = 'flex';
+                document.getElementById('btn-pause').style.display = 'none';
+            }
+        }
+
+        function cambiarVolumen(valor) {
+            audioPlayer.volume = valor / 100;
+        }
+
+        // Reemplazar función control antigua
+        window.control = async function(action) {
+            if (action.includes('play')) {
+                const titulo = document.getElementById('p-title')?.innerText;
+                if (titulo && titulo !== 'Selecciona canción') {
+                    await reproducirCancion(titulo);
+                } else {
+                    alert('Haz clic en una canción de la lista primero');
+                }
+            } else if (action === 'pause') {
+                togglePlay();
+            }
+        };
+                // ==========================================
+        // MODAL CANCIÓN SIMPLE (CREAR/EDITAR)
+        // ==========================================
+        function abrirModalCancionSimple() {
+            console.log('➕ Abriendo modal canción simple');
+
+            // Limpiar campos
+            document.getElementById('can-titulo').value = '';
+            document.getElementById('can-duracion').value = '';
+            document.getElementById('can-artista-id').value = '';
+            document.getElementById('can-album-id').value = '';
+            document.getElementById('can-genero-id').value = '1';
+            document.getElementById('can-anio').value = '';
+            document.getElementById('can-id-form').value = '';
+
+            document.getElementById('form-can-titulo-modal').innerText = 'Nueva Canción';
+
+            // Abrir modal
+            document.getElementById('modal-cancion-form').style.display = 'flex';
+        }
+
+        async function guardarCancionSimple() {
+            console.log('💾 Guardando canción (método simple)...');
+
+            // Capturar valores con los IDs del modal simple
+            const titulo = document.getElementById('can-titulo')?.value;
+            const duracion = document.getElementById('can-duracion')?.value;
+            const artistaId = document.getElementById('can-artista-id')?.value;
+            const albumId = document.getElementById('can-album-id')?.value;
+            const generoId = document.getElementById('can-genero-id')?.value || '1';
+            const anio = document.getElementById('can-anio')?.value;
+            const idCancion = document.getElementById('can-id-form')?.value;
+
+            console.log('Datos capturados:', { titulo, duracion, artistaId, albumId, generoId, anio });
+
+            // Validaciones
+            if (!titulo?.trim()) {
+                return mostrarError('can-error-msg', "⚠️ El título es obligatorio");
+            }
+
+            if (!artistaId) {
+                return mostrarError('can-error-msg', "⚠️ Debes especificar un Artista");
+            }
+
+            const match = duracion?.match(/^(\d+):(\d{2})$/);
+            if (!match) {
+                return mostrarError('can-error-msg', "⚠️ Formato de duración inválido (ej: 3:45)");
+            }
+
+            if (parseInt(match[2]) >= 60) {
+                return mostrarError('can-error-msg', "⚠️ Los segundos deben ser menores a 60");
+            }
+
+            // Preparar datos
+            const fd = new FormData();
+            fd.append('titulo', titulo.trim());
+            fd.append('duracion', duracion);
+            fd.append('artista_id', artistaId);
+            fd.append('genero_id', generoId);
+
+            if (albumId && albumId.trim() !== '') {
+                fd.append('album_id', albumId);
+            }
+
+            if (anio && anio.trim() !== '') {
+                fd.append('anio_lanzamiento', anio);
+            }
+
+            const url = idCancion ? `/canciones/${idCancion}` : '/canciones/';
+            const method = idCancion ? 'PUT' : 'POST';
+
+            console.log('📤 Enviando a:', url, 'Método:', method);
+
+            try {
+                const res = await fetch(url, { method: method, body: fd });
+
+                const contentType = res.headers.get("content-type");
+                let data;
+
+                if (contentType && contentType.includes("application/json")) {
+                    data = await res.json();
+                } else {
+                    const text = await res.text();
+                    console.error("❌ Respuesta no-JSON:", text);
+                    throw new Error("El servidor devolvió un error HTML");
+                }
+
+                if (res.ok) {
+                    console.log('✅ Canción guardada:', data);
+                    mostrarExito("✅ Canción guardada exitosamente");
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    console.error('❌ Error del servidor:', data);
+                    mostrarError('can-error-msg', data.detail || "Error desconocido");
+                }
+            } catch (e) {
+                console.error("🔥 Error completo:", e);
+                mostrarError('can-error-msg', "❌ Error: " + e.message);
             }
         }
 

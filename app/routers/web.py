@@ -47,62 +47,63 @@ async def dashboard(
     # ---------------------------------------------------------
     user = request.session.get("user")
 
-    # 2. DIAGNÓSTICO DE ANALYTICS (MODO FORENSE)
+    # 2. DIAGNÓSTICO DE ANALYTICS (MODO FORENSE) - SOPORTE ANÓNIMO
     # ---------------------------------------------------------
     insights = None
-    if user:
-        print(f"\n{'=' * 40}")
-        print(f"🕵️‍♂️ INICIO DIAGNÓSTICO DASHBOARD")
-        print(f"👤 Usuario: {user.get('display_name')} (ID: {user.get('uid')})")
 
-        try:
-            user_id = user.get('uid')
-            analytics = AnalyticsService(session)
+    # Determinar user_id (autenticado o anónimo)
+    user_id = user.get('uid') if user else "anonimo"
 
-            # Verificamos si realmente hay datos en la BD para este usuario
-            eventos = session.exec(select(UserEvent).where(UserEvent.user_id == user_id)).all()
-            total_eventos = len(eventos)
+    print(f"\n{'=' * 40}")
+    print(f"🕵️‍♂️ INICIO DIAGNÓSTICO DASHBOARD")
+    print(f"👤 Usuario: {user.get('display_name') if user else 'Anónimo'} (ID: {user_id})")
 
-            print(f"📊 Eventos en Base de Datos: {total_eventos}")
+    try:
+        analytics = AnalyticsService(session)
 
-            if total_eventos > 0:
-                print(f"✅ Hay datos. Último evento detectado: {eventos[-1].event_type}")
+        # Verificamos si realmente hay datos en la BD para este usuario
+        eventos = session.exec(select(UserEvent).where(UserEvent.user_id == user_id)).all()
+        total_eventos = len(eventos)
 
-                # Calculamos métricas
-                energia = analytics.comparar_energia(user_id)
-                explorador = analytics.analizar_explorador(user_id)
-                horario = analytics.analizar_horarios(user_id)
+        print(f"📊 Eventos en Base de Datos: {total_eventos}")
 
-                print(f"⚡ Insight Energía calculado: {energia}")
+        if total_eventos > 0:
+            print(f"✅ Hay datos. Último evento detectado: {eventos[-1].event_type}")
 
-                raw_insights = {
-                    "energia": energia,
-                    "explorador": explorador,
-                    "horario": horario
-                }
+            # Calculamos métricas
+            energia = analytics.comparar_energia(user_id)
+            explorador = analytics.analizar_explorador(user_id)
+            horario = analytics.analizar_horarios(user_id)
 
-                # Filtros de visualización (Para no mostrar tarjetas vacías)
-                has_energy = raw_insights.get('energia') is not None
-                has_explorer = raw_insights.get('explorador') and raw_insights['explorador']['score'] > 0
+            print(f"⚡ Insight Energía calculado: {energia}")
 
-                if has_energy or has_explorer:
-                    insights = raw_insights
-                    print("🏆 Insights generados correctamente y enviados al template.")
-                else:
-                    print(
-                        "⚠️ Datos existen pero no generaron insights válidos (Falta 'energy' en el JSON o poca actividad).")
+            raw_insights = {
+                "energia": energia,
+                "explorador": explorador,
+                "horario": horario
+            }
+
+            # Filtros de visualización (Para no mostrar tarjetas vacías)
+            has_energy = raw_insights.get('energia') is not None and raw_insights['energia'].get(
+                'tu_energia') is not None
+            has_explorer = raw_insights.get('explorador') and raw_insights['explorador']['score'] > 0
+
+            if has_energy or has_explorer:
+                insights = raw_insights
+                print("🏆 Insights generados correctamente y enviados al template.")
             else:
-                print("❌ BASE DE DATOS DE EVENTOS VACÍA PARA ESTE USUARIO.")
-                print("💡 Pista: Si inyectaste datos por consola, verifica que el usuario logueado coincida.")
+                print(
+                    "⚠️ Datos existen pero no generaron insights válidos (Falta 'energy' en el JSON o poca actividad).")
+        else:
+            print("❌ BASE DE DATOS DE EVENTOS VACÍA PARA ESTE USUARIO.")
+            print("💡 Pista: El auto-generador JavaScript debería crear eventos automáticamente.")
 
-        except Exception as e:
-            print(f"🔥 EXCEPCIÓN CRÍTICA EN ANALYTICS: {e}")
-            import traceback
-            traceback.print_exc()
-            insights = None
-        print(f"{'=' * 40}\n")
-    else:
-        print("👤 Usuario no logueado (Modo Visitante)")
+    except Exception as e:
+        print(f"🔥 EXCEPCIÓN CRÍTICA EN ANALYTICS: {e}")
+        import traceback
+        traceback.print_exc()
+        insights = None
+    print(f"{'=' * 40}\n")
 
     # 3. INICIALIZACIÓN DE REPOSITORIOS
     # ---------------------------------------------------------
@@ -179,7 +180,14 @@ async def dashboard(
         elif filtro == "generos":
             context["generos"] = repo_genero.get_all()
 
+    # DEBUG: Verificar insights
+    if context.get("insights"):
+        print(f"✅ INSIGHTS EN CONTEXTO: {context['insights']}")
+    else:
+        print("❌ NO HAY INSIGHTS EN CONTEXTO")
+
     return templates.TemplateResponse("dashboard.html", context)
+
 
 
 # ==============================================================================
@@ -338,3 +346,90 @@ def get_album_data(id_album: int, session: Session = Depends(get_session)):
         "genero_id": album.genero_id,
         "canciones": [{"id": c.id_cancion, "titulo": c.titulo, "duracion": c.duracion} for c in canciones]
     }
+
+
+# ==============================================================================
+# BÚSQUEDA EN SPOTIFY (CUANDO NO HAY RESULTADOS LOCALES)
+# ==============================================================================
+@router.get("/buscar-spotify")
+def buscar_spotify(q: str, session: Session = Depends(get_session)):
+    """
+    Busca en Spotify API y retorna resultados formateados.
+    Se llama desde el frontend cuando la búsqueda local no da resultados.
+    """
+    if not q or len(q.strip()) < 2:
+        return {"artistas": [], "albumes": [], "canciones": []}
+
+    ms = MusicService(session)
+
+    try:
+        # Buscar en Spotify (artistas, álbumes, canciones)
+        resultados = ms.search(q, type='track,artist,album', limit=5)
+
+        # Formatear artistas
+        artistas_spotify = []
+        if 'artists' in resultados and resultados['artists']['items']:
+            for item in resultados['artists']['items']:
+                artistas_spotify.append({
+                    "id": item['id'],
+                    "nombre": item['name'],
+                    "foto": item['images'][0]['url'] if item.get('images') else None,
+                    "tipo": "spotify_artist"
+                })
+
+        # Formatear álbumes
+        albumes_spotify = []
+        if 'albums' in resultados and resultados['albums']['items']:
+            for item in resultados['albums']['items']:
+                albumes_spotify.append({
+                    "id": item['id'],
+                    "nombre": item['name'],
+                    "foto": item['images'][0]['url'] if item.get('images') else None,
+                    "artista": item['artists'][0]['name'] if item.get('artists') else "Desconocido",
+                    "anio": item['release_date'][:4] if item.get('release_date') else "",
+                    "tipo": "spotify_album"
+                })
+
+        # Formatear canciones
+        canciones_spotify = []
+        if 'tracks' in resultados and resultados['tracks']['items']:
+            for item in resultados['tracks']['items']:
+                ms_dur = item['duration_ms']
+                duracion = f"{int(ms_dur / 60000)}:{int((ms_dur % 60000) / 1000):02d}"
+
+                canciones_spotify.append({
+                    "id": item['id'],
+                    "titulo": item['name'],
+                    "artista": item['artists'][0]['name'] if item.get('artists') else "Desconocido",
+                    "duracion": duracion,
+                    "foto": item['album']['images'][0]['url'] if item['album'].get('images') else None,
+                    "tipo": "spotify_track"
+                })
+
+        return {
+            "artistas": artistas_spotify,
+            "albumes": albumes_spotify,
+            "canciones": canciones_spotify
+        }
+
+    except Exception as e:
+        print(f"❌ Error buscando en Spotify: {e}")
+        return {"artistas": [], "albumes": [], "canciones": [], "error": str(e)}
+
+
+@router.post("/importar-desde-spotify")
+def importar_desde_spotify(
+        spotify_id: str = Query(...),
+        tipo: str = Query(...),
+        session: Session = Depends(get_session)
+):
+    ms = MusicService(session)
+
+    try:
+        resultado = ms.importar_inteligente(spotify_id, tipo)
+        session.commit()  # ⚠️ AGREGA ESTO
+        session.close()  # ⚠️ Y ESTO
+        return resultado
+    except Exception as e:
+        session.rollback()
+        return {"error": str(e)}

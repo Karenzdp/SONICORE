@@ -28,5 +28,6 @@ def create_db_and_tables():
     from app.models.generos import Genero
     from app.models.favoritos import Favorito
     from app.models.api import API
+    from app.models.analytics import UserEvent, ExternalBaseline
 
     SQLModel.metadata.create_all(engine)
