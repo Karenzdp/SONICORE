@@ -6,7 +6,12 @@ if TYPE_CHECKING:
     from app.models.artistas import Artista
     from app.models.generos import Genero
     from app.models.canciones import Cancion
+"""reistras de forma individual por p¿jugadro en cada encuentro, (o  importa si splo ingresounos minutos), estaditicas de participacion con las que 
+represena el total de tiempo en la cancha en minutps, este dato ser de lto valor, entendiendo que no es lo mismo 2 goles en 90 minutos que 2 goles en 15. las est 
+ofensivas son la represenacion de los goles anotados por el jgador urante su intervencion en un partido. importante tener faltas y tarjetas que recibe, , con ellas se modifica el estado del jugadr suspendido 
+y a antidad de encuentros que se perdera o perdio
 
+"""
 # --- MODELO BD ---
 class Album(BaseControl, table=True):
     __tablename__ = "albunes"
